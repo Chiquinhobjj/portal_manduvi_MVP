@@ -3,16 +3,15 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Upload,
+  Trash2,
+  Download,
   Search,
-  Folder,
   Image as ImageIcon,
   File,
-  Trash2,
   Copy,
-  Download,
-  Filter,
+  Folder,
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { logger } from '../lib/logger';
 
 interface MediaFile {
   id: string;
@@ -70,7 +69,7 @@ export function AdminMediaPage() {
       if (error) throw error;
       setMediaFiles(data || []);
     } catch (error) {
-      console.error('Error fetching media files:', error);
+      logger.error('Error fetching media files:', error);
     } finally {
       setLoading(false);
     }
@@ -123,7 +122,7 @@ export function AdminMediaPage() {
       resetForm();
       fetchMediaFiles();
     } catch (error) {
-      console.error('Error uploading file:', error);
+      logger.error('Error uploading file:', error);
       alert('Erro ao fazer upload do arquivo');
     }
   }
@@ -141,7 +140,7 @@ export function AdminMediaPage() {
       await logActivity('delete', 'media_file', file.id);
       fetchMediaFiles();
     } catch (error) {
-      console.error('Error deleting file:', error);
+      logger.error('Error deleting file:', error);
       alert('Erro ao excluir arquivo');
     }
   }
@@ -155,7 +154,7 @@ export function AdminMediaPage() {
         entity_id: entityId,
       });
     } catch (error) {
-      console.error('Error logging activity:', error);
+      logger.error('Error logging activity:', error);
     }
   }
 

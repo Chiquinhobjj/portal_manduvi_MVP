@@ -160,7 +160,12 @@ Especialistas indicam tendência de expansão para os próximos meses, com poss�
 
             <div className="lg:col-span-1 space-y-6">
               <SourcesRail citations={citations} />
-              <AdSlot format="mpu" />
+              <AdSlot 
+                format="mpu" 
+                imageUrl="/fotos/propaganda/freepik-projeto-sem-titulo-20251001161418FBLo.png"
+                altText="[NOTÍCIAS] MPU Sidebar - Material Publicitário 1"
+                linkUrl="https://exemplo.com/noticias-mpu-1"
+              />
             </div>
           </div>
         ) : (
@@ -181,7 +186,12 @@ Especialistas indicam tendência de expansão para os próximos meses, com poss�
             </div>
 
             <div className="lg:col-span-1 space-y-6">
-              <AdSlot format="mpu" />
+              <AdSlot 
+                format="mpu" 
+                imageUrl="/fotos/propaganda/freepik-projeto-sem-titulo-20251001161418FBLo.png"
+                altText="[NOTÍCIAS] MPU Sidebar - Material Publicitário 2"
+                linkUrl="https://exemplo.com/noticias-mpu-2"
+              />
 
               <div className="rounded-lgx border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-6">
                 <h3 className="text-sm font-brand font-semibold mb-4">temas populares</h3>

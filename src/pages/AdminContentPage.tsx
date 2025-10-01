@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Pencil, Trash2, Eye, EyeOff, Save } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { logger } from '../lib/logger';
 
 interface ContentSection {
   id: string;
@@ -56,7 +57,7 @@ export function AdminContentPage() {
       if (error) throw error;
       setSections(data || []);
     } catch (error) {
-      console.error('Error fetching sections:', error);
+      logger.error('Error fetching sections:', error);
     } finally {
       setLoading(false);
     }
@@ -112,7 +113,7 @@ export function AdminContentPage() {
       resetForm();
       fetchSections();
     } catch (error) {
-      console.error('Error saving section:', error);
+      logger.error('Error saving section:', error);
       alert('Erro ao salvar seção');
     }
   }
@@ -132,7 +133,7 @@ export function AdminContentPage() {
       await logActivity('update', 'content_section', section.id);
       fetchSections();
     } catch (error) {
-      console.error('Error toggling section:', error);
+      logger.error('Error toggling section:', error);
     }
   }
 
@@ -149,7 +150,7 @@ export function AdminContentPage() {
       await logActivity('delete', 'content_section', section.id);
       fetchSections();
     } catch (error) {
-      console.error('Error deleting section:', error);
+      logger.error('Error deleting section:', error);
       alert('Erro ao excluir seção');
     }
   }
@@ -163,7 +164,7 @@ export function AdminContentPage() {
         entity_id: entityId,
       });
     } catch (error) {
-      console.error('Error logging activity:', error);
+      logger.error('Error logging activity:', error);
     }
   }
 

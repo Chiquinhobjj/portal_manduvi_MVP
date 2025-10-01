@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, MapPin, Building2, Calendar, Save, Loader2, Shield } from 'lucide-react';
+import { logger } from '../lib/logger';
 
 interface ProfileData {
   full_name?: string;
@@ -55,7 +56,7 @@ export function ProfilePage() {
         setProfileData(data);
       }
     } catch (error) {
-      console.error('Error loading profile data:', error);
+      logger.error('Error loading profile data:', error);
     } finally {
       setLoading(false);
     }
@@ -99,7 +100,7 @@ export function ProfilePage() {
 
       setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
     } catch (error: any) {
-      console.error('Error saving profile:', error);
+      logger.error('Error saving profile:', error);
       setMessage({ type: 'error', text: error.message || 'Erro ao salvar perfil' });
     } finally {
       setSaving(false);

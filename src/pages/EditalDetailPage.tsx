@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 import { Calendar, MapPin, Building, DollarSign, ExternalLink, ArrowLeft, Clock, FileText } from 'lucide-react';
 
 interface Edital {
@@ -54,7 +55,7 @@ export function EditalDetailPage() {
         await supabase.rpc('increment_edital_views', { edital_id: data.id });
       }
     } catch (error) {
-      console.error('Error fetching edital:', error);
+      logger.error('Error fetching edital:', error);
     } finally {
       setLoading(false);
     }

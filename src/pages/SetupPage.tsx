@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { VantaBackground } from '../components/VantaBackground';
 import { Shield, AlertCircle, CheckCircle } from 'lucide-react';
+import { logger } from '../lib/logger';
 
 export function SetupPage() {
   const [fullName, setFullName] = useState('');
@@ -35,7 +36,7 @@ export function SetupPage() {
         setSetupComplete(true);
       }
     } catch (error) {
-      console.error('Error checking setup:', error);
+      logger.error('Error checking setup:', error);
     } finally {
       setCheckingSetup(false);
     }
@@ -107,7 +108,7 @@ export function SetupPage() {
         navigate('/login');
       }, 3000);
     } catch (error: any) {
-      console.error('Setup error:', error);
+      logger.error('Setup error:', error);
       setError(
         error.message || 'Erro ao criar conta de administrador. Tente novamente.'
       );

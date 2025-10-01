@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Calendar, MapPin, ArrowRight, Filter } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 interface Initiative {
   slug: string;
@@ -31,6 +32,7 @@ export function IniciativasPage() {
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [filteredInitiatives, setFilteredInitiatives] = useState<Initiative[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
 
@@ -44,16 +46,31 @@ export function IniciativasPage() {
 
   async function fetchInitiatives() {
     try {
-      const { data } = await supabase
+      setError(null);
+      setLoading(true);
+      
+      const { data, error: supabaseError } = await supabase
         .from('initiatives')
         .select('*')
         .order('order_index');
 
+      if (supabaseError) {
+        console.error('Supabase error:', supabaseError);
+        throw new Error(`Erro do banco de dados: ${supabaseError.message}`);
+      }
+
       if (data) {
         setInitiatives(data);
+        console.log('Initiatives loaded:', data.length);
+      } else {
+        setInitiatives([]);
+        console.log('No initiatives found');
       }
     } catch (error) {
       console.error('Error fetching initiatives:', error);
+      logger.error('Error fetching initiatives:', error);
+      setError(error instanceof Error ? error.message : 'Erro ao carregar iniciativas. Tente novamente.');
+      setInitiatives([]);
     } finally {
       setLoading(false);
     }
@@ -79,7 +96,39 @@ export function IniciativasPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto mb-4"></div>
+          <p className="text-ui-muted dark:text-dark-muted">Carregando iniciativas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen">
+        <div className="bg-gradient-to-br from-[#8B5A3C] to-[#6B4423] text-white">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+            <h1 className="text-4xl sm:text-5xl font-brand font-bold mb-4">iniciativas</h1>
+            <p className="text-xl text-white/90 max-w-3xl">
+              Conheça as iniciativas que transformam vidas através do esporte, educação, saúde e inovação social
+            </p>
+          </div>
+        </div>
+        
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+          <div className="text-center py-12">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 max-w-md mx-auto">
+              <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+              <button
+                onClick={fetchInitiatives}
+                className="bg-brand text-white px-4 py-2 rounded-lg hover:bg-brand/90 transition-colors"
+              >
+                Tentar Novamente
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

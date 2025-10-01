@@ -46,18 +46,7 @@ export function DadosPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="border-b border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl sm:text-4xl font-brand font-bold mb-2">
-            observatório de dados
-          </h1>
-          <p className="text-ui-muted dark:text-dark-muted">
-            indicadores, painéis interativos e análises geradas por IA
-          </p>
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
           <h2 className="text-xl font-brand font-semibold mb-4">indicadores em destaque</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -86,7 +75,12 @@ export function DadosPage() {
           </div>
 
           <div className="lg:col-span-1 space-y-6">
-            <AdSlot format="mpu" />
+            <AdSlot 
+              format="mpu" 
+              imageUrl="/fotos/propaganda/freepik-projeto-sem-titulo-20251001161418FBLo.png"
+              altText="[DADOS] MPU Sidebar - Material Publicitário"
+              linkUrl="https://exemplo.com/dados-mpu"
+            />
 
             <div className="rounded-lgx border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-6">
               <h3 className="text-sm font-brand font-semibold mb-4">

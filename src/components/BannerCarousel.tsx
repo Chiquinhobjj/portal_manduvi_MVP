@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { logger } from '../lib/logger';
 
 interface Banner {
   id: string;
@@ -66,7 +67,7 @@ export function BannerCarousel({
 
       setBanners(activeBanners);
     } catch (error) {
-      console.error('Error fetching banners:', error);
+      logger.error('Error fetching banners:', error);
     } finally {
       setLoading(false);
     }
@@ -98,7 +99,7 @@ export function BannerCarousel({
         });
       }
     } catch (error) {
-      console.error('Error fetching carousel settings:', error);
+      logger.error('Error fetching carousel settings:', error);
     }
   }
 
@@ -115,7 +116,7 @@ export function BannerCarousel({
         session_id: sessionId,
       });
     } catch (error) {
-      console.error('Error tracking banner event:', error);
+      logger.error('Error tracking banner event:', error);
     }
   }
 

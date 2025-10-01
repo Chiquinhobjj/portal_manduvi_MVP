@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Users, Search, Filter, CheckCircle, XCircle, Clock, Shield, Building2, CircleUser as UserCircle, Briefcase } from 'lucide-react';
+import { logger } from '../lib/logger';
 
 interface User {
   id: string;
@@ -49,7 +50,7 @@ export function AdminUsersPage() {
       const data = await response.json();
       setUsers(data || []);
     } catch (error) {
-      console.error('Error fetching users:', error);
+      logger.error('Error fetching users:', error);
     } finally {
       setLoading(false);
     }
@@ -78,7 +79,7 @@ export function AdminUsersPage() {
         )
       );
     } catch (error) {
-      console.error('Error updating user status:', error);
+      logger.error('Error updating user status:', error);
       alert('Erro ao atualizar status do usuário');
     }
   }

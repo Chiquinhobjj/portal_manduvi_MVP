@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { CometTopBar } from '../components/comet/CometTopBar';
 import { Chipbar, ChipbarFilters } from '../components/comet/Chipbar';
@@ -6,8 +6,9 @@ import { AnswerStream } from '../components/comet/AnswerStream';
 import { SourcesRail, Citation } from '../components/comet/SourcesRail';
 import { FollowUps } from '../components/comet/FollowUps';
 import { AdSlot, NativeAd } from '../components/AdSlot';
+import { SmartAdCarousel } from '../components/SmartAdCarousel';
 import { BannerCarousel } from '../components/BannerCarousel';
-import { Newspaper, FileText, BarChart3, ArrowRight } from 'lucide-react';
+import { Newspaper, FileText, BarChart3, ArrowRight, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export function HomePage() {
   const [query, setQuery] = useState('');
@@ -93,11 +94,46 @@ O sistema consultou múltiplas fontes e identificou os seguintes pontos principa
     setFollowUps(mockFollowUps);
   };
 
+  // Dados de exemplo para o carrossel de propaganda
+  const adItems = [
+    {
+      id: '1',
+      imageUrl: '/fotos/propaganda/freepik-projeto-sem-titulo-20251001161418FBLo.png',
+      linkUrl: 'https://exemplo.com/propaganda1',
+      altText: 'Material Publicitário 1',
+      title: 'Propaganda Home Topo 1'
+    },
+    {
+      id: '2',
+      imageUrl: '/fotos/propaganda/freepik-projeto-sem-titulo-20251001161418FBLo.png',
+      linkUrl: 'https://exemplo.com/propaganda2',
+      altText: 'Material Publicitário 2',
+      title: 'Propaganda Home Topo 2'
+    }
+  ];
+
   return (
     <div className="min-h-screen">
-      <AdSlot format="leaderboard" className="mx-auto mt-4 mb-6" />
-
       <BannerCarousel className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mb-8" />
+
+      {/* PUBLICIDADE MEIO - Segunda posição */}
+      <div className="mb-8">
+        <SmartAdCarousel
+          folderPath="/public/fotos/propaganda/modelo_BannerCarousel_970x120px"
+          location="HOME-MEIO"
+          height={480}
+          autoRotate={true}
+          rotationInterval={8000}
+          showNavigation={true}
+          showIndicators={true}
+          maxImages={5}
+          defaultLinkUrl="https://exemplo.com"
+          showCTAButton={true}
+          ctaText="Saiba Mais"
+          ctaUrl="https://exemplo.com/cta"
+          ctaPosition="bottom-center"
+        />
+      </div>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-12 text-center">
@@ -105,7 +141,7 @@ O sistema consultou múltiplas fontes e identificou os seguintes pontos principa
             o que você procura?
           </h1>
           <p className="mx-auto max-w-2xl text-lg text-ui-muted dark:text-dark-muted">
-            assistente inteligente para notícias, serviços e dados do ecossistema de impacto
+            assistente inteligente para notícias, serviços e dados do ecossistema manduvi
           </p>
         </div>
 
@@ -141,30 +177,12 @@ O sistema consultou múltiplas fontes e identificou os seguintes pontos principa
 
         {!query && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-              <QuickAction
-                icon={<Newspaper />}
-                title="notícias"
-                description="últimas atualizações com contexto e fontes"
-                to="/noticias"
-              />
-              <QuickAction
-                icon={<FileText />}
-                title="serviços"
-                description="catálogo de serviços institucionais"
-                to="/servicos"
-              />
-              <QuickAction
-                icon={<BarChart3 />}
-                title="dados"
-                description="indicadores e painéis do observatório"
-                to="/dados"
-              />
-            </div>
+            {/* Nova Seção de Cards Interativos */}
+            <MainSectionsCarousel />
 
             <NativeAd
               label="Conheça nossos parceiros de impacto"
-              description="Organizações e iniciativas que constroem o futuro sustentável do Brasil Central"
+              description="Organizações e iniciativas que constroem o futuro sustentável"
               link="/parceiros"
               className="mx-auto max-w-4xl mb-12"
             />
@@ -276,5 +294,206 @@ function ContentSection({
         ))}
       </ul>
     </div>
+  );
+}
+
+// Dados das seções principais
+const mainSections = [
+  {
+    title: 'Notícias',
+    description: 'Últimas atualizações com contexto e fontes',
+    icon: <Newspaper className="w-8 h-8" />,
+    to: '/noticias',
+    color: 'bg-blue-600',
+    bgImage: '/fotos/61.jpg'
+  },
+  {
+    title: 'Serviços',
+    description: 'Catálogo de serviços institucionais',
+    icon: <FileText className="w-8 h-8" />,
+    to: '/servicos',
+    color: 'bg-green-600',
+    bgImage: '/fotos/62.jpg'
+  },
+  {
+    title: 'Dados',
+    description: 'Indicadores e painéis do observatório',
+    icon: <BarChart3 className="w-8 h-8" />,
+    to: '/dados',
+    color: 'bg-purple-600',
+    bgImage: '/fotos/63.jpg'
+  },
+  {
+    title: 'Instituto',
+    description: 'Conheça nossa missão e impacto',
+    icon: <Info className="w-8 h-8" />,
+    to: '/instituto',
+    color: 'bg-orange-600',
+    bgImage: '/fotos/65.jpg'
+  }
+];
+
+// Componente do Card Individual
+function SectionCard({ section }: { section: typeof mainSections[0] }) {
+  return (
+    <Link 
+      to={section.to}
+      className="relative h-[280px] text-white group overflow-hidden cursor-pointer flex-shrink-0 w-full rounded-xl"
+    >
+      <img 
+        src={section.bgImage} 
+        alt={section.title} 
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+      /> 
+      <div className={`absolute inset-0 ${section.color} opacity-80 mix-blend-multiply transition-transform duration-500 group-hover:scale-110`}></div> 
+      <div className="absolute top-4 right-4 opacity-70 group-hover:opacity-100 transition-opacity duration-300"> 
+        <Info className="w-6 h-6"/> 
+      </div> 
+      <div className="relative z-10 flex flex-col justify-between h-full p-6"> 
+        <div className="text-white/90 group-hover:text-white transition-colors duration-300"> 
+          {section.icon}
+        </div> 
+        <div className="space-y-3"> 
+          <h3 className="text-xl font-bold">{section.title}</h3> 
+          <p className="text-sm font-medium leading-relaxed opacity-90"> 
+            {section.description} 
+          </p> 
+          <button className="border-2 border-white text-white font-semibold py-2 px-5 hover:bg-white hover:text-black transition-all duration-300 rounded-lg group-hover:scale-105"> 
+            Conheça 
+          </button> 
+        </div> 
+      </div> 
+    </Link>
+  );
+}
+
+// Componente Principal do Carrossel
+function MainSectionsCarousel() {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [itemsPerView, setItemsPerView] = useState(3);
+
+  // Responsividade - ajustar quantos itens mostrar por tela
+  useEffect(() => {
+    const updateItemsPerView = () => {
+      if (window.innerWidth < 768) {
+        setItemsPerView(1); // Mobile: 1 item
+      } else if (window.innerWidth < 1024) {
+        setItemsPerView(2); // Tablet: 2 itens
+      } else {
+        setItemsPerView(3); // Desktop: 3 itens
+      }
+    };
+
+    updateItemsPerView();
+    window.addEventListener('resize', updateItemsPerView);
+    return () => window.removeEventListener('resize', updateItemsPerView);
+  }, []);
+
+  // Auto-play do carrossel
+  useEffect(() => {
+    if (!isAutoPlaying) return;
+    
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => {
+        const maxIndex = Math.max(0, mainSections.length - itemsPerView);
+        return prev >= maxIndex ? 0 : prev + 1;
+      });
+    }, 5000); // Muda a cada 5 segundos
+
+    return () => clearInterval(interval);
+  }, [isAutoPlaying, itemsPerView]);
+
+  const nextSlide = () => {
+    const maxIndex = Math.max(0, mainSections.length - itemsPerView);
+    setCurrentIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
+  };
+
+  const prevSlide = () => {
+    const maxIndex = Math.max(0, mainSections.length - itemsPerView);
+    setCurrentIndex((prev) => (prev <= 0 ? maxIndex : prev - 1));
+  };
+
+  const goToSlide = (index: number) => {
+    setCurrentIndex(index);
+  };
+
+  const maxIndex = Math.max(0, mainSections.length - itemsPerView);
+
+  return (
+    <section className="py-16 mb-12">
+      {/* Header da Seção */}
+      <div className="text-center mb-12">
+        <h2 className="text-3xl md:text-4xl font-bold text-ui-text dark:text-dark-text mb-4">
+          Explore Nossas Áreas
+        </h2>
+        <p className="text-lg text-ui-muted dark:text-dark-muted max-w-3xl mx-auto">
+          Descubra informações, serviços e dados que impulsionam o desenvolvimento sustentável
+        </p>
+      </div>
+
+      {/* Container do Carrossel */}
+      <div 
+        className="relative overflow-hidden"
+        onMouseEnter={() => setIsAutoPlaying(false)}
+        onMouseLeave={() => setIsAutoPlaying(true)}
+      >
+        {/* Botões de Navegação */}
+        {mainSections.length > itemsPerView && (
+          <>
+            <button 
+              onClick={prevSlide}
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20 bg-white/90 hover:bg-white text-ui-text dark:text-dark-text rounded-full p-3 shadow-lg hover:shadow-xl transition-all duration-300"
+              aria-label="Seção anterior"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+
+            <button 
+              onClick={nextSlide}
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 bg-white/90 hover:bg-white text-ui-text dark:text-dark-text rounded-full p-3 shadow-lg hover:shadow-xl transition-all duration-300"
+              aria-label="Próxima seção"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          </>
+        )}
+
+        {/* Cards Container */}
+        <div className="flex transition-transform duration-500 ease-in-out px-4">
+          <div 
+            className="flex"
+            style={{ 
+              transform: `translateX(-${currentIndex * (100 / itemsPerView)}%)`,
+              width: `${(mainSections.length / itemsPerView) * 100}%`
+            }}
+          >
+            {mainSections.map((section, index) => (
+              <div key={index} style={{ width: `${100 / mainSections.length}%` }}>
+                <SectionCard section={section} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Indicadores */}
+        {maxIndex > 0 && (
+          <div className="flex justify-center mt-8 space-x-2">
+            {Array.from({ length: maxIndex + 1 }).map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goToSlide(index)}
+                className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                  index === currentIndex 
+                    ? 'bg-brand scale-110' 
+                    : 'bg-ui-muted dark:bg-dark-muted hover:bg-brand/50'
+                }`}
+                aria-label={`Ir para slide ${index + 1}`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

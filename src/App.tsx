@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { Layout } from './components/Layout';
 import { AdminLayout } from './components/AdminLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -26,71 +28,76 @@ import { AdminEditaisPage } from './pages/AdminEditaisPage';
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/setup" element={<SetupPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/setup" element={<SetupPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
 
-        <Route path="/" element={<Layout />}>
-          <Route index element={<HomePage />} />
-          <Route path="noticias" element={<NoticiasPage />} />
-          <Route path="servicos" element={<ServicosPage />} />
-          <Route path="dados" element={<DadosPage />} />
-          <Route path="temas" element={<TemasPage />} />
-          <Route path="editais" element={<EditaisPage />} />
-          <Route path="editais/:slug" element={<EditalDetailPage />} />
-          <Route path="iniciativas" element={<IniciativasPage />} />
-          <Route path="iniciativas/:slug" element={<InitiativeDetailPage />} />
-          <Route
-            path="profile"
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="*"
-            element={
-              <div className="flex min-h-screen items-center justify-center">
-                <div className="text-center">
-                  <h1 className="mb-4 text-4xl font-brand font-bold">404</h1>
-                  <p className="text-ui-muted">página não encontrada</p>
-                </div>
-              </div>
-            }
-          />
-        </Route>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<HomePage />} />
+              <Route path="noticias" element={<NoticiasPage />} />
+              <Route path="servicos" element={<ServicosPage />} />
+              <Route path="dados" element={<DadosPage />} />
+              <Route path="temas" element={<TemasPage />} />
+              <Route path="editais" element={<EditaisPage />} />
+              <Route path="editais/:slug" element={<EditalDetailPage />} />
+              <Route path="iniciativas" element={<IniciativasPage />} />
+              <Route path="iniciativas/:slug" element={<InitiativeDetailPage />} />
+              <Route path="instituto" element={<InstitutoPage />} />
+              <Route
+                path="profile"
+                element={
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="*"
+                element={
+                  <div className="flex min-h-screen items-center justify-center">
+                    <div className="text-center">
+                      <h1 className="mb-4 text-4xl font-brand font-bold">404</h1>
+                      <p className="text-ui-muted">página não encontrada</p>
+                    </div>
+                  </div>
+                }
+              />
+            </Route>
 
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<DashboardPage />} />
-        </Route>
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<DashboardPage />} />
+            </Route>
 
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="banners" element={<AdminBannersPage />} />
-          <Route path="content" element={<AdminContentPage />} />
-          <Route path="media" element={<AdminMediaPage />} />
-          <Route path="editais" element={<AdminEditaisPage />} />
-          <Route path="users" element={<AdminUsersPage />} />
-          <Route path="settings" element={<AdminSettingsPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="banners" element={<AdminBannersPage />} />
+              <Route path="content" element={<AdminContentPage />} />
+              <Route path="media" element={<AdminMediaPage />} />
+              <Route path="editais" element={<AdminEditaisPage />} />
+              <Route path="users" element={<AdminUsersPage />} />
+              <Route path="settings" element={<AdminSettingsPage />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

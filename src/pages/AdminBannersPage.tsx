@@ -7,13 +7,13 @@ import {
   Trash2,
   ToggleLeft,
   ToggleRight,
-  GripVertical,
   ExternalLink,
   TrendingUp,
   Eye,
   MousePointerClick,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { logger } from '../lib/logger';
 
 interface Banner {
   id: string;
@@ -34,6 +34,7 @@ export function AdminBannersPage() {
   const { profile } = useAuth();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [formData, setFormData] = useState({
@@ -60,7 +61,7 @@ export function AdminBannersPage() {
       if (error) throw error;
       setBanners(data || []);
     } catch (error) {
-      console.error('Error fetching banners:', error);
+      logger.error('Error fetching banners:', error);
     } finally {
       setLoading(false);
     }
@@ -68,6 +69,7 @@ export function AdminBannersPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSaving(true);
 
     try {
       if (editingBanner) {
@@ -103,8 +105,9 @@ export function AdminBannersPage() {
       resetForm();
       fetchBanners();
     } catch (error) {
-      console.error('Error saving banner:', error);
-      alert('Erro ao salvar banner');
+      logger.error('Error saving banner:', error);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -120,7 +123,7 @@ export function AdminBannersPage() {
       await logActivity('update', 'banner', banner.id);
       fetchBanners();
     } catch (error) {
-      console.error('Error toggling banner:', error);
+      logger.error('Error toggling banner:', error);
     }
   }
 
@@ -137,7 +140,7 @@ export function AdminBannersPage() {
       await logActivity('delete', 'banner', banner.id);
       fetchBanners();
     } catch (error) {
-      console.error('Error deleting banner:', error);
+      logger.error('Error deleting banner:', error);
       alert('Erro ao excluir banner');
     }
   }
@@ -151,7 +154,7 @@ export function AdminBannersPage() {
         entity_id: entityId,
       });
     } catch (error) {
-      console.error('Error logging activity:', error);
+      logger.error('Error logging activity:', error);
     }
   }
 
@@ -481,15 +484,24 @@ export function AdminBannersPage() {
                     setEditingBanner(null);
                     resetForm();
                   }}
-                  className="flex-1 rounded-lg border border-ui-border dark:border-dark-border px-4 py-2 text-sm font-medium text-ui-text dark:text-dark-text hover:bg-ui-bg dark:hover:bg-dark-bg transition-colors"
+                  disabled={saving}
+                  className="flex-1 rounded-lg border border-ui-border dark:border-dark-border px-4 py-2 text-sm font-medium text-ui-text dark:text-dark-text hover:bg-ui-bg dark:hover:bg-dark-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-warm transition-colors"
+                  disabled={saving}
+                  className="flex-1 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-warm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingBanner ? 'Salvar' : 'Criar'}
+                  {saving ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      Salvando...
+                    </div>
+                  ) : (
+                    editingBanner ? 'Salvar' : 'Criar'
+                  )}
                 </button>
               </div>
             </form>

@@ -48,16 +48,7 @@ export function ServicosPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="border-b border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl sm:text-4xl font-brand font-bold mb-2">serviços</h1>
-          <p className="text-ui-muted dark:text-dark-muted">
-            catálogo de serviços institucionais com assistência inteligente
-          </p>
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ui-muted dark:text-dark-muted" />
@@ -117,7 +108,12 @@ export function ServicosPage() {
           </div>
 
           <div className="lg:col-span-1 space-y-6">
-            <AdSlot format="mpu" />
+            <AdSlot 
+              format="mpu" 
+              imageUrl="/fotos/propaganda/freepik-projeto-sem-titulo-20251001161418FBLo.png"
+              altText="[SERVIÇOS] MPU Sidebar - Material Publicitário"
+              linkUrl="https://exemplo.com/servicos-mpu"
+            />
 
             <div className="rounded-lgx border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-6">
               <h3 className="text-sm font-brand font-semibold mb-4">

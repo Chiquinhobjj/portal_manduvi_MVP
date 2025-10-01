@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Search, Filter, Calendar, MapPin, Building, Star, Clock, ArrowRight } from 'lucide-react';
+import { logger } from '../lib/logger';
 
 interface Edital {
   id: string;
@@ -45,7 +46,7 @@ export function EditaisPage() {
       if (error) throw error;
       setEditais(data || []);
     } catch (error) {
-      console.error('Error fetching editais:', error);
+      logger.error('Error fetching editais:', error);
     } finally {
       setLoading(false);
     }

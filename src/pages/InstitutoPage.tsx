@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Heart, Lightbulb, Target, Sparkles, Users, Handshake, MapPin, Award, TrendingUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 interface Section {
   section_key: string;
@@ -69,7 +70,7 @@ export function InstitutoPage() {
       if (valuesData.data) setValues(valuesData.data);
       if (projectsData.data) setProjects(projectsData.data);
     } catch (error) {
-      console.error('Error fetching instituto data:', error);
+      logger.error('Error fetching instituto data:', error);
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, RefreshCw, Settings as SettingsIcon } from 'lucide-react';
+import { logger } from '../lib/logger';
 
 interface Setting {
   id: string;
@@ -41,7 +42,7 @@ export function AdminSettingsPage() {
       });
       setFormData(formValues);
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      logger.error('Error fetching settings:', error);
     } finally {
       setLoading(false);
     }
@@ -70,8 +71,7 @@ export function AdminSettingsPage() {
       alert('Configurações salvas com sucesso!');
       fetchSettings();
     } catch (error) {
-      console.error('Error saving settings:', error);
-      alert('Erro ao salvar configurações');
+      logger.error('Error saving settings:', error);
     } finally {
       setSaving(false);
     }
@@ -86,7 +86,7 @@ export function AdminSettingsPage() {
         entity_id: entityId,
       });
     } catch (error) {
-      console.error('Error logging activity:', error);
+      logger.error('Error logging activity:', error);
     }
   }
 

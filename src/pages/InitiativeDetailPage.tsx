@@ -12,6 +12,7 @@ import {
   Handshake
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 interface Initiative {
   slug: string;
@@ -84,8 +85,7 @@ export function InitiativeDetailPage() {
       if (impactsData.data) setImpacts(impactsData.data);
       if (milestonesData.data) setMilestones(milestonesData.data);
     } catch (error) {
-      console.error('Error fetching initiative:', error);
-      navigate('/iniciativas');
+      logger.error('Error fetching initiative:', error);
     } finally {
       setLoading(false);
     }

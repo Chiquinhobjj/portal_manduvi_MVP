@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, CreditCard as Edit, Trash2, Eye, Calendar, Building } from 'lucide-react';
+import { logger } from '../lib/logger';
 
 interface Edital {
   id: string;
@@ -41,7 +42,7 @@ export function AdminEditaisPage() {
       if (error) throw error;
       setEditais(data || []);
     } catch (error) {
-      console.error('Error fetching editais:', error);
+      logger.error('Error fetching editais:', error);
     } finally {
       setLoading(false);
     }
@@ -59,7 +60,7 @@ export function AdminEditaisPage() {
       if (error) throw error;
       fetchEditais();
     } catch (error) {
-      console.error('Error deleting edital:', error);
+      logger.error('Error deleting edital:', error);
       alert('Erro ao excluir edital');
     }
   }
