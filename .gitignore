@@ -28,4 +28,6 @@ dist-ssr
 .cursor/rules/byterover-rules.mdc
 .kiro/steering/byterover-rules.md
 .qoder/rules/byterover-rules.md
-.augment/rules/byterover-rules.md
+.augment/rules/byterover-rules.md# Arquivos de vídeo grandes
+public/fotos/propaganda/videos/*.mov
+public/fotos/propaganda/videos/*.mp4
