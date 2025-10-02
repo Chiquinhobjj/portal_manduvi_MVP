@@ -5,7 +5,6 @@ import { Chipbar, ChipbarFilters } from '../components/comet/Chipbar';
 import { AnswerStream } from '../components/comet/AnswerStream';
 import { SourcesRail, Citation } from '../components/comet/SourcesRail';
 import { FollowUps } from '../components/comet/FollowUps';
-import { AdSlot, NativeAd } from '../components/AdSlot';
 import { SmartAdCarousel } from '../components/SmartAdCarousel';
 import { BannerCarousel } from '../components/BannerCarousel';
 import { Newspaper, FileText, BarChart3, ArrowRight, Info, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -95,22 +94,8 @@ O sistema consultou múltiplas fontes e identificou os seguintes pontos principa
   };
 
   // Dados de exemplo para o carrossel de propaganda
-  const adItems = [
-    {
-      id: '1',
-      imageUrl: '/fotos/propaganda/freepik-projeto-sem-titulo-20251001161418FBLo.png',
-      linkUrl: 'https://exemplo.com/propaganda1',
-      altText: 'Material Publicitário 1',
-      title: 'Propaganda Home Topo 1'
-    },
-    {
-      id: '2',
-      imageUrl: '/fotos/propaganda/freepik-projeto-sem-titulo-20251001161418FBLo.png',
-      linkUrl: 'https://exemplo.com/propaganda2',
-      altText: 'Material Publicitário 2',
-      title: 'Propaganda Home Topo 2'
-    }
-  ];
+  // Remover a variável adItems não utilizada
+  // const adItems = [...] - REMOVIDO
 
   return (
     <div className="min-h-screen">
@@ -180,13 +165,6 @@ O sistema consultou múltiplas fontes e identificou os seguintes pontos principa
             {/* Nova Seção de Cards Interativos */}
             <MainSectionsCarousel />
 
-            <NativeAd
-              label="Conheça nossos parceiros de impacto"
-              description="Organizações e iniciativas que constroem o futuro sustentável"
-              link="/parceiros"
-              className="mx-auto max-w-4xl mb-12"
-            />
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <ContentSection
                 title="últimas notícias"
@@ -231,30 +209,8 @@ O sistema consultou múltiplas fontes e identificou os seguintes pontos principa
   );
 }
 
-function QuickAction({
-  icon,
-  title,
-  description,
-  to,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  to: string;
-}) {
-  return (
-    <Link
-      to={to}
-      className="group flex flex-col items-center rounded-lgx border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-6 text-center transition-all hover:border-brand hover:shadow-soft"
-    >
-      <div className="mb-4 rounded-xl bg-brand/10 p-4 text-brand transition-transform group-hover:scale-110">
-        {icon}
-      </div>
-      <h3 className="mb-2 text-lg font-brand font-semibold">{title}</h3>
-      <p className="text-sm text-ui-muted dark:text-dark-muted">{description}</p>
-    </Link>
-  );
-}
+// Remover a função QuickAction não utilizada
+// function QuickAction({...}) {...} - REMOVIDO
 
 function ContentSection({
   title,

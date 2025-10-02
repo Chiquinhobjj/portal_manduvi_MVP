@@ -66,7 +66,7 @@ export function SmartAdCarousel({
     setCurrentIndex(index);
   }
 
-  function handleAdClick(image: any) {
+  function handleAdClick() {
     if (defaultLinkUrl) {
       window.open(defaultLinkUrl, '_blank');
     }
@@ -147,14 +147,14 @@ export function SmartAdCarousel({
             <div key={image.id} className="min-w-full h-full flex justify-center items-center relative">
               {/* Imagem clicável - agora usando div ao invés de button */}
               <div
-                onClick={() => handleAdClick(image)}
+                onClick={() => handleAdClick()}
                 className="group w-full h-full transition-transform hover:scale-[1.02] cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 rounded-lg overflow-hidden relative"
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    handleAdClick(image);
+                    handleAdClick();
                   }
                 }}
                 aria-label={image.altText}

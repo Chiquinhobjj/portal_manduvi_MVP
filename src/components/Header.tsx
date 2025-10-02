@@ -1,10 +1,8 @@
-import { Link } from 'react-router-dom';
-import { Search, Menu, X, Globe, Moon, Sun, ChevronDown, User, Loader2, LogOut } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Menu, X, Globe, Moon, Sun, ChevronDown, User, LogOut } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
-import { logger } from '../lib/logger';
 
 interface MenuItem {
   slug: string;
@@ -15,12 +13,12 @@ interface MenuItem {
 export function Header() {
   const { theme, toggleTheme } = useTheme();
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false); // ✅ CORREÇÃO: Começar com false
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  // ✅ CORREÇÃO: Menu estático em vez de buscar do banco
+  // Menu estático
   const staticMenuItems: MenuItem[] = [
     { slug: 'editais', title: 'Editais', order_index: 1 },
     { slug: 'iniciativas', title: 'Iniciativas', order_index: 2 },
@@ -31,9 +29,7 @@ export function Header() {
   ];
 
   useEffect(() => {
-    // ✅ CORREÇÃO: Usar menu estático
     setMenuItems(staticMenuItems);
-    setIsLoading(false);
   }, []);
 
   const toggleMenu = () => {
@@ -47,6 +43,7 @@ export function Header() {
   const handleSignOut = async () => {
     await signOut();
     setShowUserMenu(false);
+    navigate('/login');
   };
 
   return (
