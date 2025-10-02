@@ -174,3 +174,4 @@ Este é um projeto em desenvolvimento ativo. Contribuições são bem-vindas!
 ---
 
 **Nota**: Este é um MVP funcional. A integração com LLM real e o pipeline RAG completo serão implementados nas próximas iterações.
+# portal_manduvi_MVP
