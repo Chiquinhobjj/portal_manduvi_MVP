@@ -1,8 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { SpeedInsights } from "@vercel/speed-insights/react";
-import "./index.css";
-import App from "./App.tsx";
+import "@styles/index.css";
+import App from "@src/App.tsx";
 
 // Desabilitar logs em produção
 if (import.meta.env.PROD) {
