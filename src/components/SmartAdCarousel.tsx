@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAdImages } from '../hooks/useAdImages';
+import { useMediaLibraryImages } from '../hooks/useMediaLibraryImages';
 
 interface SmartAdCarouselProps {
   folderPath: string;
@@ -38,9 +39,14 @@ export function SmartAdCarousel({
   ctaText = 'Saiba Mais',
   ctaUrl,
   ctaPosition = 'bottom-center',
-  showOverlay = false
-}: SmartAdCarouselProps) {
-  const { images, loading, error } = useAdImages(folderPath, location, maxImages);
+  showOverlay = false,
+  source = 'static',
+  mediaFolder,
+}: SmartAdCarouselProps & { source?: 'static' | 'media'; mediaFolder?: string }) {
+  const { images, loading, error } =
+    source === 'media' && mediaFolder
+      ? useMediaLibraryImages(mediaFolder, location, maxImages)
+      : useAdImages(folderPath, location, maxImages);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 

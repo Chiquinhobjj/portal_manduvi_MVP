@@ -104,6 +104,8 @@ O sistema consultou múltiplas fontes e identificou os seguintes pontos principa
       {/* PUBLICIDADE MEIO - Segunda posição */}
       <div className="mb-8">
         <SmartAdCarousel
+          source="media"
+          mediaFolder="banners"
           folderPath="/fotos/propaganda/modelo_BannerCarousel_970x120px"
           location="HOME-MEIO"
           height={480}
