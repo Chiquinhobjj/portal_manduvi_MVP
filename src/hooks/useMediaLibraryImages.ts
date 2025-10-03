@@ -31,7 +31,7 @@ export function useMediaLibraryImages(
 
       const { data, error } = await supabase
         .from('media_library')
-        .select('id, file_name, file_url, alt_text, folder, uploaded_at')
+        .select('id, file_name, file_url, file_path, alt_text, folder, uploaded_at, link_url')
         .eq('folder', folder)
         .order('uploaded_at', { ascending: false })
         .limit(maxImages);
@@ -49,13 +49,20 @@ export function useMediaLibraryImages(
         return `${url}${sep}${params.toString()}`;
       };
 
-      const adImages: AdImage[] = (data || []).map((file, index) => ({
-        id: `${location}-${index + 1}`,
-        imageUrl: buildUrlWithTransform(file.file_url),
-        fileName: file.file_name,
-        altText: file.alt_text || file.file_name,
-        title: file.file_name,
-      }));
+      const adImages: AdImage[] = (data || []).map((file, index) => {
+        let publicUrl = file.file_url;
+        if (!publicUrl && file.file_path) {
+          const { data: pub } = supabase.storage.from('media').getPublicUrl(file.file_path);
+          publicUrl = pub.publicUrl;
+        }
+        return {
+          id: `${location}-${index + 1}`,
+          imageUrl: buildUrlWithTransform(publicUrl),
+          fileName: file.file_name,
+          altText: file.alt_text || file.file_name,
+          title: file.file_name,
+        };
+      });
 
       setImages(adImages);
     } catch (err) {

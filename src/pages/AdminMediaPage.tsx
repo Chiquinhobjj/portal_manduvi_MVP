@@ -512,6 +512,20 @@ export function AdminMediaPage() {
                 )}
               </div>
 
+              {/* Link de destino opcional (para anúncios) */}
+              <div>
+                <label className="block text-sm font-medium text-ui-text dark:text-dark-text mb-2">
+                  URL de Destino (opcional)
+                </label>
+                <input
+                  type="url"
+                  value={(uploadData as any).link_url || ''}
+                  onChange={(e) => setUploadData({ ...uploadData, link_url: e.target.value } as any)}
+                  placeholder="https://... (link quando clicar na imagem)"
+                  className="w-full rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-ui-text dark:text-dark-text mb-2">
                   Texto Alternativo (Alt)
