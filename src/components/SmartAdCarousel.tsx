@@ -22,6 +22,7 @@ interface SmartAdCarouselProps {
   ctaPosition?: 'bottom-left' | 'bottom-right' | 'bottom-center' | 'center';
   // Nova prop para controlar overlay
   showOverlay?: boolean;
+  hideWhenEmpty?: boolean; // novo
 }
 
 export function SmartAdCarousel({
@@ -42,10 +43,11 @@ export function SmartAdCarousel({
   showOverlay = false,
   source = 'static',
   mediaFolder,
+  hideWhenEmpty = false,
 }: SmartAdCarouselProps & { source?: 'static' | 'media'; mediaFolder?: string }) {
   const { images, loading, error } =
     source === 'media' && mediaFolder
-      ? useMediaLibraryImages(mediaFolder, location, maxImages)
+      ? useMediaLibraryImages(mediaFolder, location, maxImages, { height, resize: 'cover', quality: 85 })
       : useAdImages(folderPath, location, maxImages);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -120,6 +122,7 @@ export function SmartAdCarousel({
   }
 
   if (error || images.length === 0) {
+    if (hideWhenEmpty) return null;
     return (
       <div
         className={cn('relative w-full bg-ui-light dark:bg-dark-light rounded-lg', className)}

@@ -7,7 +7,7 @@ export function Layout() {
   return (
     <div className="flex min-h-screen flex-col relative bg-gray-50 dark:bg-gray-900">
       
-      {/* PUBLICIDADE TOPO - Acima do menu (padrão sites de notícias) */}
+      {/* PUBLICIDADE TOPO */}
       <div className="w-full bg-ui-bg dark:bg-dark-bg border-b border-ui-border dark:border-dark-border relative z-50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-2">
           <SmartAdCarousel 
@@ -22,6 +22,7 @@ export function Layout() {
             showIndicators={true}
             defaultLinkUrl="https://exemplo.com"
             maxImages={5}
+            hideWhenEmpty={true}
           />
         </div>
       </div>

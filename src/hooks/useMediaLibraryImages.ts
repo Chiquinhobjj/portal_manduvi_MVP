@@ -10,14 +10,19 @@ interface AdImage {
   title: string;
 }
 
-export function useMediaLibraryImages(folder: string, location: string, maxImages: number = 5) {
+export function useMediaLibraryImages(
+  folder: string,
+  location: string,
+  maxImages: number = 5,
+  transform?: { width?: number; height?: number; resize?: 'cover' | 'contain' | 'fill'; quality?: number }
+) {
   const [images, setImages] = useState<AdImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadImagesFromMediaLibrary();
-  }, [folder, maxImages]);
+  }, [folder, maxImages, transform]);
 
   async function loadImagesFromMediaLibrary() {
     try {
@@ -33,9 +38,20 @@ export function useMediaLibraryImages(folder: string, location: string, maxImage
 
       if (error) throw error;
 
+      const buildUrlWithTransform = (url: string) => {
+        if (!transform) return url;
+        const params = new URLSearchParams();
+        if (transform.width) params.set('width', String(transform.width));
+        if (transform.height) params.set('height', String(transform.height));
+        if (transform.resize) params.set('resize', transform.resize);
+        if (transform.quality) params.set('quality', String(transform.quality));
+        const sep = url.includes('?') ? '&' : '?';
+        return `${url}${sep}${params.toString()}`;
+      };
+
       const adImages: AdImage[] = (data || []).map((file, index) => ({
         id: `${location}-${index + 1}`,
-        imageUrl: file.file_url,
+        imageUrl: buildUrlWithTransform(file.file_url),
         fileName: file.file_name,
         altText: file.alt_text || file.file_name,
         title: file.file_name,
