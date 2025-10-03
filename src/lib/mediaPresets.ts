@@ -16,8 +16,7 @@ export const mediaPresets: MediaPreset[] = [
     recommendedHeight: 120,
     targetComponent: 'SmartAdCarousel',
     targetLocation: 'Layout.tsx → SITE-TOPO',
-    notes: 'Formato clássico 970x120. PNG/JPG.
-    ',
+    notes: 'Formato clássico 970x120. PNG/JPG.',
   },
   {
     folder: 'banners',
