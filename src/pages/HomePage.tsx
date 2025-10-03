@@ -104,7 +104,7 @@ O sistema consultou múltiplas fontes e identificou os seguintes pontos principa
       {/* PUBLICIDADE MEIO - Segunda posição */}
       <div className="mb-8">
         <SmartAdCarousel
-          folderPath="/public/fotos/propaganda/modelo_BannerCarousel_970x120px"
+          folderPath="/fotos/propaganda/modelo_BannerCarousel_970x120px"
           location="HOME-MEIO"
           height={480}
           autoRotate={true}
