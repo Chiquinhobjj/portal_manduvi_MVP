@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
 
@@ -20,11 +20,22 @@ export function useMediaLibraryImages(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadImagesFromMediaLibrary();
-  }, [folder, maxImages, transform]);
+  const serializedTransform = useMemo(
+    () => JSON.stringify(transform ?? {}),
+    [transform]
+  );
 
-  async function loadImagesFromMediaLibrary() {
+  const normalizedTransform = useMemo(() => {
+    if (!transform) return undefined;
+    return {
+      width: transform.width,
+      height: transform.height,
+      resize: transform.resize,
+      quality: transform.quality,
+    };
+  }, [serializedTransform]);
+
+  const loadImagesFromMediaLibrary = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -39,12 +50,16 @@ export function useMediaLibraryImages(
       if (error) throw error;
 
       const buildUrlWithTransform = (url: string) => {
-        if (!transform) return url;
+        if (!normalizedTransform) return url;
         const params = new URLSearchParams();
-        if (transform.width) params.set('width', String(transform.width));
-        if (transform.height) params.set('height', String(transform.height));
-        if (transform.resize) params.set('resize', transform.resize);
-        if (transform.quality) params.set('quality', String(transform.quality));
+        if (normalizedTransform.width)
+          params.set('width', String(normalizedTransform.width));
+        if (normalizedTransform.height)
+          params.set('height', String(normalizedTransform.height));
+        if (normalizedTransform.resize)
+          params.set('resize', normalizedTransform.resize);
+        if (normalizedTransform.quality)
+          params.set('quality', String(normalizedTransform.quality));
         const sep = url.includes('?') ? '&' : '?';
         return `${url}${sep}${params.toString()}`;
       };
@@ -71,7 +86,11 @@ export function useMediaLibraryImages(
     } finally {
       setLoading(false);
     }
-  }
+  }, [folder, location, maxImages, normalizedTransform]);
+
+  useEffect(() => {
+    loadImagesFromMediaLibrary();
+  }, [loadImagesFromMediaLibrary]);
 
   return { images, loading, error, reload: loadImagesFromMediaLibrary };
 }

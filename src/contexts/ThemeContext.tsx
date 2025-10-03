@@ -9,23 +9,45 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const savedTheme = localStorage.getItem('theme') as Theme | null;
-    if (savedTheme) {
-      return savedTheme;
+function resolveInitialTheme(): Theme {
+  if (typeof window === 'undefined') {
+    return 'light';
+  }
+
+  try {
+    const stored = window.localStorage.getItem('theme') as Theme | null;
+    if (stored === 'light' || stored === 'dark') {
+      return stored;
     }
+  } catch (error) {
+    console.warn('ThemeProvider: não foi possível ler theme do localStorage', error);
+  }
+
+  if (typeof window.matchMedia === 'function') {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  }
+
+  return 'light';
+}
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useState<Theme>(resolveInitialTheme);
 
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
+    if (typeof document === 'undefined') {
+      return;
     }
-    localStorage.setItem('theme', theme);
+
+    const root = document.documentElement;
+    root.classList.toggle('dark', theme === 'dark');
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('theme', theme);
+      } catch (error) {
+        console.warn('ThemeProvider: não foi possível salvar theme no localStorage', error);
+      }
+    }
   }, [theme]);
 
   const toggleTheme = () => {
