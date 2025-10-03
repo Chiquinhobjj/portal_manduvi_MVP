@@ -45,29 +45,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
-
-    // Timeout de segurança - se após 10 segundos ainda estiver carregando, forçar parada
+    // Timeout amigável aumentado para 30s e sem erro duro
     timeoutId = setTimeout(() => {
       if (mounted && loading) {
-        console.warn('Timeout de autenticação - forçando parada do loading');
+        console.warn('Autenticação demorando... mantendo app utilizável');
         setLoading(false);
-        setError('Timeout na verificação de autenticação');
+        // Não definir erro aqui para evitar bloqueio do app
       }
-    }, 10000);
+    }, 30000);
 
     // Função para inicializar a autenticação
     const initializeAuth = async () => {
       try {
         console.log('Inicializando autenticação...');
         
-        // Obter sessão atual
-        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-        
+        // Obter sessão atual com pequenas tentativas
+        let currentSession: Session | null = null;
+        let sessionError: any = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (!error) {
+            currentSession = session;
+            sessionError = null;
+            break;
+          }
+          sessionError = error;
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+
         if (sessionError) {
           console.error('Erro ao obter sessão:', sessionError);
           if (mounted) {
-            setError('Erro ao verificar autenticação');
+            // Não bloquear o app: limpar loading e permitir navegação pública
             setLoading(false);
+            setError('Erro ao verificar autenticação');
           }
           return;
         }
