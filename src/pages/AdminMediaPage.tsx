@@ -12,6 +12,7 @@ import {
   Folder,
 } from 'lucide-react';
 import { logger } from '../lib/logger';
+import { mediaPresets, getPresetByFolder } from '../lib/mediaPresets';
 
 interface MediaFile {
   id: string;
@@ -29,7 +30,11 @@ interface MediaFile {
 
 const folders = [
   { value: 'general', label: 'Geral' },
-  { value: 'banners', label: 'Banners' },
+  { value: 'banners', label: 'Banners (Home)' },
+  { value: 'ads_leaderboard', label: 'Publicidade – Topo (970x120)' },
+  { value: 'ads_mpu', label: 'Publicidade – MPU (300x250)' },
+  { value: 'ads_halfpage', label: 'Publicidade – Half Page (300x600)' },
+  { value: 'ads_incontent', label: 'Publicidade – In-Content (300x250)' },
   { value: 'editais', label: 'Editais' },
   { value: 'news', label: 'Notícias' },
   { value: 'initiatives', label: 'Iniciativas' },
@@ -43,9 +48,11 @@ export function AdminMediaPage() {
   const [selectedFolder, setSelectedFolder] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const [uploadData, setUploadData] = useState({
     file_name: '',
-    file_url: '',
+    file_url: '', // opcional se usar Storage
     folder: 'general',
     alt_text: '',
     tags: '',
@@ -104,11 +111,44 @@ export function AdminMediaPage() {
         .map((t) => t.trim())
         .filter((t) => t);
 
+      let publicUrl = uploadData.file_url;
+      let fileType = 'image/unknown';
+      let fileSize = 0;
+      let width: number | null = null;
+      let height: number | null = null;
+
+      // Se um arquivo local foi selecionado, faz upload para o Storage
+      if (selectedFile) {
+        fileType = selectedFile.type || fileType;
+        fileSize = selectedFile.size;
+        if (imageSize) {
+          width = imageSize.width;
+          height = imageSize.height;
+        }
+
+        const path = `${uploadData.folder}/${Date.now()}_${selectedFile.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('media')
+          .upload(path, selectedFile, { upsert: true });
+        if (uploadError) throw uploadError;
+
+        const { data: publicData } = supabase.storage.from('media').getPublicUrl(path);
+        publicUrl = publicData.publicUrl;
+      }
+
+      // Validação simples: precisa de arquivo (local ou URL)
+      if (!publicUrl) {
+        alert('Selecione um arquivo de imagem ou informe uma URL pública.');
+        return;
+      }
+
       const { error } = await supabase.from('media_library').insert({
-        file_name: uploadData.file_name,
-        file_url: uploadData.file_url,
-        file_type: 'image/unknown',
-        file_size: 0,
+        file_name: uploadData.file_name || (selectedFile ? selectedFile.name : publicUrl),
+        file_url: publicUrl,
+        file_type: fileType,
+        file_size: fileSize,
+        width,
+        height,
         folder: uploadData.folder,
         alt_text: uploadData.alt_text || null,
         tags,
@@ -179,6 +219,8 @@ export function AdminMediaPage() {
       alt_text: '',
       tags: '',
     });
+    setSelectedFile(null);
+    setImageSize(null);
   }
 
   const totalSize = mediaFiles.reduce((sum, file) => sum + file.file_size, 0);
@@ -382,9 +424,41 @@ export function AdminMediaPage() {
                 />
               </div>
 
+              {/* Upload de arquivo local para o Storage */}
               <div>
                 <label className="block text-sm font-medium text-ui-text dark:text-dark-text mb-2">
-                  URL do Arquivo *
+                  Arquivo de Imagem (Upload)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0] || null;
+                    setSelectedFile(f);
+                    if (f) {
+                      const blobUrl = URL.createObjectURL(f);
+                      const img = new Image();
+                      img.onload = () => {
+                        setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
+                        URL.revokeObjectURL(blobUrl);
+                      };
+                      img.src = blobUrl;
+                    } else {
+                      setImageSize(null);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                />
+                {imageSize && (
+                  <p className="mt-2 text-xs text-ui-muted dark:text-dark-muted">
+                    Dimensões detectadas: {imageSize.width} × {imageSize.height}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-ui-text dark:text-dark-text mb-2">
+                  URL pública (opcional)
                 </label>
                 <input
                   type="url"
@@ -393,7 +467,7 @@ export function AdminMediaPage() {
                     setUploadData({ ...uploadData, file_url: e.target.value })
                   }
                   className="w-full rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                  required
+                  placeholder="https://... (use se a imagem já estiver pública)"
                 />
                 {uploadData.file_url && (
                   <div className="mt-2 p-2 bg-ui-bg dark:bg-dark-bg rounded-lg">
@@ -422,6 +496,20 @@ export function AdminMediaPage() {
                     </option>
                   ))}
                 </select>
+                {/* Dicas de tamanho por local */}
+                {getPresetByFolder(uploadData.folder) && (
+                  <div className="mt-2 text-xs rounded bg-ui-bg dark:bg-dark-bg p-2">
+                    <p className="text-ui-muted dark:text-dark-muted">
+                      Local: {getPresetByFolder(uploadData.folder)!.label}
+                    </p>
+                    <p className="text-ui-muted dark:text-dark-muted">
+                      Tamanho recomendado: {getPresetByFolder(uploadData.folder)!.recommendedWidth} × {getPresetByFolder(uploadData.folder)!.recommendedHeight}px
+                    </p>
+                    <p className="text-ui-muted dark:text-dark-muted">
+                      Componente: {getPresetByFolder(uploadData.folder)!.targetComponent} • Página: {getPresetByFolder(uploadData.folder)!.targetLocation}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>

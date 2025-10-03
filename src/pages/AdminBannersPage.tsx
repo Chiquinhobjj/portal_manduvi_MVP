@@ -268,6 +268,16 @@ export function AdminBannersPage() {
         </div>
       </div>
 
+      {/* Guia rápido de tamanhos para banners da Home */}
+      <div className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-4 mb-6">
+        <p className="text-sm text-ui-muted dark:text-dark-muted">
+          Tamanho recomendado para o carrossel da Home: <span className="font-semibold">1200 × 400 px</span> (horizontal). Use imagens com pouco texto para melhor legibilidade.
+        </p>
+        <p className="text-sm text-ui-muted dark:text-dark-muted mt-1">
+          Dica: faça upload na <span className="font-semibold">Biblioteca de Mídia</span> e cole a URL pública aqui.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {banners.map((banner) => (
           <div
