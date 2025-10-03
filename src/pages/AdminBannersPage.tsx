@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Pencil,
@@ -11,24 +9,27 @@ import {
   TrendingUp,
   Eye,
   MousePointerClick,
+  Image as ImageIcon,
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 import { logger } from '../lib/logger';
+import type { Banner } from '../lib/types';
+import {
+  deleteBanner,
+  fetchBanners,
+  saveBanner,
+  toggleBannerActive,
+} from '../admin/services/banners';
 
-interface Banner {
-  id: string;
-  title: string;
-  image_url: string;
-  link_url: string | null;
-  description: string | null;
-  display_order: number;
-  is_active: boolean;
-  start_date: string | null;
-  end_date: string | null;
-  click_count: number;
-  impression_count: number;
-  created_at: string;
-}
+const emptyFormState = {
+  title: '',
+  image_url: '',
+  link_url: '',
+  description: '',
+  is_active: true,
+  start_date: '',
+  end_date: '',
+};
 
 export function AdminBannersPage() {
   const { profile } = useAuth();
@@ -37,124 +38,24 @@ export function AdminBannersPage() {
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
-  const [formData, setFormData] = useState({
-    title: '',
-    image_url: '',
-    link_url: '',
-    description: '',
-    is_active: true,
-    start_date: '',
-    end_date: '',
-  });
+  const [formData, setFormData] = useState(emptyFormState);
+
+  const activeBanners = useMemo(() => banners.filter((banner) => banner.is_active), [banners]);
 
   useEffect(() => {
-    fetchBanners();
+    loadBanners();
   }, []);
 
-  async function fetchBanners() {
+  async function loadBanners() {
     try {
-      const { data, error } = await supabase
-        .from('banners')
-        .select('*')
-        .order('display_order', { ascending: true });
-
-      if (error) throw error;
-      setBanners(data || []);
+      setLoading(true);
+      const data = await fetchBanners();
+      setBanners(data);
     } catch (error) {
       logger.error('Error fetching banners:', error);
+      alert(error instanceof Error ? error.message : 'Erro ao carregar banners.');
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-
-    try {
-      if (editingBanner) {
-        const { error } = await supabase
-          .from('banners')
-          .update({
-            ...formData,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', editingBanner.id);
-
-        if (error) throw error;
-      } else {
-        const maxOrder = banners.length > 0 ? Math.max(...banners.map((b) => b.display_order)) : 0;
-
-        const { error } = await supabase.from('banners').insert({
-          ...formData,
-          display_order: maxOrder + 1,
-          created_by: profile?.id,
-        });
-
-        if (error) throw error;
-      }
-
-      await logActivity(
-        editingBanner ? 'update' : 'create',
-        'banner',
-        editingBanner?.id || null
-      );
-
-      setShowModal(false);
-      setEditingBanner(null);
-      resetForm();
-      fetchBanners();
-    } catch (error) {
-      logger.error('Error saving banner:', error);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleToggleActive(banner: Banner) {
-    try {
-      const { error } = await supabase
-        .from('banners')
-        .update({ is_active: !banner.is_active })
-        .eq('id', banner.id);
-
-      if (error) throw error;
-
-      await logActivity('update', 'banner', banner.id);
-      fetchBanners();
-    } catch (error) {
-      logger.error('Error toggling banner:', error);
-    }
-  }
-
-  async function handleDelete(banner: Banner) {
-    if (!confirm(`Tem certeza que deseja excluir o banner "${banner.title}"?`)) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase.from('banners').delete().eq('id', banner.id);
-
-      if (error) throw error;
-
-      await logActivity('delete', 'banner', banner.id);
-      fetchBanners();
-    } catch (error) {
-      logger.error('Error deleting banner:', error);
-      alert('Erro ao excluir banner');
-    }
-  }
-
-  async function logActivity(action: string, entityType: string, entityId: string | null) {
-    try {
-      await supabase.from('admin_activity_log').insert({
-        user_id: profile?.id,
-        action,
-        entity_type: entityType,
-        entity_id: entityId,
-      });
-    } catch (error) {
-      logger.error('Error logging activity:', error);
     }
   }
 
@@ -165,328 +66,311 @@ export function AdminBannersPage() {
   }
 
   function openEditModal(banner: Banner) {
+    setEditingBanner(banner);
     setFormData({
       title: banner.title,
       image_url: banner.image_url,
-      link_url: banner.link_url || '',
-      description: banner.description || '',
+      link_url: banner.link_url ?? '',
+      description: banner.description ?? '',
       is_active: banner.is_active,
-      start_date: banner.start_date || '',
-      end_date: banner.end_date || '',
+      start_date: banner.start_date?.slice(0, 16) ?? '',
+      end_date: banner.end_date?.slice(0, 16) ?? '',
     });
-    setEditingBanner(banner);
     setShowModal(true);
   }
 
   function resetForm() {
-    setFormData({
-      title: '',
-      image_url: '',
-      link_url: '',
-      description: '',
-      is_active: true,
-      start_date: '',
-      end_date: '',
-    });
+    setFormData(emptyFormState);
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!formData.title.trim() || !formData.image_url.trim()) {
+      alert('Título e imagem são obrigatórios.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await saveBanner({ banner: editingBanner, form: formData, authorId: profile?.id });
+      await loadBanners();
+      setShowModal(false);
+      setEditingBanner(null);
+      resetForm();
+    } catch (error) {
+      logger.error('Error saving banner:', error);
+      alert(error instanceof Error ? error.message : 'Erro ao salvar banner.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleActive(banner: Banner) {
+    try {
+      await toggleBannerActive(banner.id, !banner.is_active);
+      await loadBanners();
+    } catch (error) {
+      logger.error('Error toggling banner:', error);
+      alert(error instanceof Error ? error.message : 'Erro ao atualizar banner.');
+    }
+  }
+
+  async function handleDelete(banner: Banner) {
+    if (!confirm(`Tem certeza que deseja excluir o banner "${banner.title}"?`)) {
+      return;
+    }
+
+    try {
+      await deleteBanner(banner.id);
+      await loadBanners();
+    } catch (error) {
+      logger.error('Error deleting banner:', error);
+      alert(error instanceof Error ? error.message : 'Erro ao excluir banner.');
+    }
   }
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand border-r-transparent"></div>
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand border-r-transparent" />
       </div>
     );
   }
 
-  const totalImpressions = banners.reduce((sum, b) => sum + b.impression_count, 0);
-  const totalClicks = banners.reduce((sum, b) => sum + b.click_count, 0);
-  const avgCTR = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : '0';
-
   return (
-    <div className="max-w-7xl">
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-ui-bg dark:bg-dark-bg">
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-brand font-bold text-ui-text dark:text-dark-text">
+            Carrossel de Banners
+          </h1>
+          <p className="text-ui-muted dark:text-dark-muted">
+            Gerencie a vitrine principal do portal (ordem, visibilidade, links e métricas).
+          </p>
+        </div>
+        <button
+          onClick={openCreateModal}
+          className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-warm"
+        >
+          <Plus className="h-5 w-5" />
+          Novo banner
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+        <div className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-4">
+          <p className="text-sm text-ui-muted dark:text-dark-muted">Banners ativos</p>
+          <p className="text-3xl font-semibold text-ui-text dark:text-dark-text">{activeBanners.length}</p>
+        </div>
+        <div className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-4">
+          <p className="text-sm text-ui-muted dark:text-dark-muted">Total cadastrados</p>
+          <p className="text-3xl font-semibold text-ui-text dark:text-dark-text">{banners.length}</p>
+        </div>
+        <div className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-4 flex items-center gap-3">
+          <TrendingUp className="h-8 w-8 text-brand" />
           <div>
-            <h1 className="text-3xl font-brand font-bold text-ui-text dark:text-dark-text">
-              Gerenciar Banners
-            </h1>
-            <p className="text-ui-muted dark:text-dark-muted mt-1">
-              Configure os banners do carrossel exibidos na página inicial
+            <p className="text-sm text-ui-muted dark:text-dark-muted">Performance</p>
+            <p className="text-xs text-ui-muted dark:text-dark-muted">
+              As métricas de impressão/clique são atualizadas automaticamente via `banner_analytics`.
             </p>
           </div>
-          <button
-            onClick={openCreateModal}
-            className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-warm"
-          >
-            <Plus className="h-5 w-5" />
-            Novo Banner
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-6">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-blue-500/10 p-3">
-                <Eye className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-ui-text dark:text-dark-text">
-                  {totalImpressions}
-                </p>
-                <p className="text-sm text-ui-muted dark:text-dark-muted">Impressões</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-6">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-green-500/10 p-3">
-                <MousePointerClick className="h-6 w-6 text-green-600 dark:text-green-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-ui-text dark:text-dark-text">
-                  {totalClicks}
-                </p>
-                <p className="text-sm text-ui-muted dark:text-dark-muted">Cliques</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-6">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-orange-500/10 p-3">
-                <TrendingUp className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-ui-text dark:text-dark-text">
-                  {avgCTR}%
-                </p>
-                <p className="text-sm text-ui-muted dark:text-dark-muted">CTR Médio</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Guia rápido de tamanhos para banners da Home */}
-      <div className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-4 mb-6">
-        <p className="text-sm text-ui-muted dark:text-dark-muted">
-          Tamanho recomendado para o carrossel da Home: <span className="font-semibold">1200 × 400 px</span> (horizontal). Use imagens com pouco texto para melhor legibilidade.
-        </p>
-        <p className="text-sm text-ui-muted dark:text-dark-muted mt-1">
-          Dica: faça upload na <span className="font-semibold">Biblioteca de Mídia</span> e cole a URL pública aqui.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {banners.map((banner) => (
-          <div
-            key={banner.id}
-            className={cn(
-              'rounded-lg border bg-ui-panel dark:bg-dark-panel overflow-hidden transition-all',
-              banner.is_active
-                ? 'border-ui-border dark:border-dark-border'
-                : 'border-ui-border/50 dark:border-dark-border/50 opacity-60'
-            )}
-          >
-            <div className="aspect-square bg-ui-bg dark:bg-dark-bg flex items-center justify-center p-4">
-              <img
-                src={banner.image_url}
-                alt={banner.title}
-                className="max-w-full max-h-full object-contain"
-              />
-            </div>
-
-            <div className="p-4">
-              <div className="flex items-start justify-between mb-2">
-                <h3 className="font-semibold text-ui-text dark:text-dark-text">
-                  {banner.title}
-                </h3>
-                <button
-                  onClick={() => handleToggleActive(banner)}
-                  className="text-ui-muted dark:text-dark-muted hover:text-brand transition-colors"
-                >
-                  {banner.is_active ? (
-                    <ToggleRight className="h-6 w-6 text-green-600" />
-                  ) : (
-                    <ToggleLeft className="h-6 w-6" />
-                  )}
-                </button>
-              </div>
-
-              {banner.description && (
-                <p className="text-sm text-ui-muted dark:text-dark-muted mb-3">
-                  {banner.description}
-                </p>
-              )}
-
-              {banner.link_url && (
-                <a
-                  href={banner.link_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-brand hover:text-brand-warm mb-3"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Ver link
-                </a>
-              )}
-
-              <div className="flex items-center gap-4 text-xs text-ui-muted dark:text-dark-muted mb-3">
-                <span className="flex items-center gap-1">
-                  <Eye className="h-3 w-3" />
-                  {banner.impression_count}
-                </span>
-                <span className="flex items-center gap-1">
-                  <MousePointerClick className="h-3 w-3" />
-                  {banner.click_count}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => openEditModal(banner)}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-ui-border dark:border-dark-border px-3 py-2 text-sm font-medium text-ui-text dark:text-dark-text hover:bg-ui-bg dark:hover:bg-dark-bg transition-colors"
-                >
-                  <Pencil className="h-4 w-4" />
-                  Editar
-                </button>
-                <button
-                  onClick={() => handleDelete(banner)}
-                  className="flex items-center justify-center rounded-lg border border-red-500/50 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {banners.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-ui-muted dark:text-dark-muted mb-4">
-            Nenhum banner cadastrado ainda
+      {banners.length === 0 ? (
+        <div className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-12 text-center">
+          <ImageIcon className="mx-auto mb-4 h-12 w-12 text-ui-muted dark:text-dark-muted" />
+          <p className="text-ui-muted dark:text-dark-muted mb-6">
+            Nenhum banner cadastrado ainda. Crie um novo para destacar campanhas importantes.
           </p>
           <button
             onClick={openCreateModal}
             className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-warm"
           >
             <Plus className="h-5 w-5" />
-            Criar Primeiro Banner
+            Criar banner
           </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6">
+          {banners.map((banner) => (
+            <div
+              key={banner.id}
+              className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-6 shadow-sm"
+            >
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="h-24 w-40 overflow-hidden rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg">
+                    <img
+                      src={banner.image_url}
+                      alt={banner.title}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-ui-text dark:text-dark-text">
+                      {banner.title}
+                    </h2>
+                    {banner.description && (
+                      <p className="text-sm text-ui-muted dark:text-dark-muted mt-1">
+                        {banner.description}
+                      </p>
+                    )}
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-ui-muted dark:text-dark-muted">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 text-brand">
+                        <Eye className="h-3 w-3" />
+                        {banner.impression_count} visualizações
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 text-brand">
+                        <MousePointerClick className="h-3 w-3" />
+                        {banner.click_count} cliques
+                      </span>
+                      {banner.link_url && (
+                        <a
+                          href={banner.link_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-full bg-ui-bg dark:bg-dark-bg px-2 py-1 hover:text-brand transition-colors"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Ver destino
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleToggleActive(banner)}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                      banner.is_active
+                        ? 'border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                        : 'border-ui-border text-ui-muted dark:text-dark-muted hover:bg-ui-bg dark:hover:bg-dark-bg'
+                    }`}
+                  >
+                    {banner.is_active ? (
+                      <>
+                        <ToggleRight className="h-4 w-4" /> Ativo
+                      </>
+                    ) : (
+                      <>
+                        <ToggleLeft className="h-4 w-4" /> Inativo
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => openEditModal(banner)}
+                    className="flex items-center gap-2 rounded-lg border border-ui-border dark:border-dark-border px-3 py-2 text-sm font-medium text-ui-text dark:text-dark-text hover:bg-ui-bg dark:hover:bg-dark-bg"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleDelete(banner)}
+                    className="flex items-center gap-2 rounded-lg border border-rose-500/40 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Excluir
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-lg bg-ui-panel dark:bg-dark-panel border border-ui-border dark:border-dark-border max-h-[90vh] overflow-y-auto">
-            <div className="border-b border-ui-border dark:border-dark-border p-6">
-              <h2 className="text-xl font-bold text-ui-text dark:text-dark-text">
-                {editingBanner ? 'Editar Banner' : 'Novo Banner'}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-2xl overflow-hidden rounded-xl bg-ui-panel dark:bg-dark-panel border border-ui-border dark:border-dark-border shadow-xl">
+            <div className="border-b border-ui-border dark:border-dark-border px-6 py-4">
+              <h2 className="text-lg font-semibold text-ui-text dark:text-dark-text">
+                {editingBanner ? 'Editar banner' : 'Novo banner'}
               </h2>
+              <p className="text-sm text-ui-muted dark:text-dark-muted mt-1">
+                Campos essenciais para o destaque na home.
+              </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-ui-text dark:text-dark-text mb-2">
-                  Título *
+            <form onSubmit={handleSubmit} className="px-6 py-6 space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                <label className="flex flex-col gap-2 text-sm font-medium text-ui-text dark:text-dark-text">
+                  Título
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(event) => setFormData({ ...formData, title: event.target.value })}
+                    required
+                    className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  />
                 </label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                  required
-                />
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-ui-text dark:text-dark-text mb-2">
-                  URL da Imagem * (100x100px recomendado)
+                <label className="flex flex-col gap-2 text-sm font-medium text-ui-text dark:text-dark-text">
+                  URL da imagem
+                  <input
+                    type="url"
+                    value={formData.image_url}
+                    onChange={(event) => setFormData({ ...formData, image_url: event.target.value })}
+                    placeholder="https://..."
+                    required
+                    className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  />
                 </label>
-                <input
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  className="w-full rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                  required
-                />
-                {formData.image_url && (
-                  <div className="mt-2 p-2 bg-ui-bg dark:bg-dark-bg rounded-lg">
-                    <img
-                      src={formData.image_url}
-                      alt="Preview"
-                      className="w-[100px] h-[100px] object-cover rounded"
+
+                <label className="flex flex-col gap-2 text-sm font-medium text-ui-text dark:text-dark-text">
+                  Link de destino (opcional)
+                  <input
+                    type="url"
+                    value={formData.link_url}
+                    onChange={(event) => setFormData({ ...formData, link_url: event.target.value })}
+                    placeholder="https://..."
+                    className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium text-ui-text dark:text-dark-text">
+                  Descrição
+                  <textarea
+                    value={formData.description}
+                    onChange={(event) => setFormData({ ...formData, description: event.target.value })}
+                    rows={3}
+                    className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  />
+                </label>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="flex flex-col gap-2 text-sm font-medium text-ui-text dark:text-dark-text">
+                    Início (opcional)
+                    <input
+                      type="datetime-local"
+                      value={formData.start_date}
+                      onChange={(event) => setFormData({ ...formData, start_date: event.target.value })}
+                      className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                     />
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ui-text dark:text-dark-text mb-2">
-                  URL de Destino (opcional)
-                </label>
-                <input
-                  type="url"
-                  value={formData.link_url}
-                  onChange={(e) => setFormData({ ...formData, link_url: e.target.value })}
-                  className="w-full rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ui-text dark:text-dark-text mb-2">
-                  Descrição (opcional)
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-ui-text dark:text-dark-text mb-2">
-                    Data de Início (opcional)
                   </label>
-                  <input
-                    type="date"
-                    value={formData.start_date}
-                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                    className="w-full rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                  />
+                  <label className="flex flex-col gap-2 text-sm font-medium text-ui-text dark:text-dark-text">
+                    Fim (opcional)
+                    <input
+                      type="datetime-local"
+                      value={formData.end_date}
+                      onChange={(event) => setFormData({ ...formData, end_date: event.target.value })}
+                      className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                    />
+                  </label>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-ui-text dark:text-dark-text mb-2">
-                    Data de Término (opcional)
-                  </label>
+                <label className="flex items-center gap-2 text-sm font-medium text-ui-text dark:text-dark-text">
                   <input
-                    type="date"
-                    value={formData.end_date}
-                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                    className="w-full rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                    type="checkbox"
+                    checked={formData.is_active}
+                    onChange={(event) => setFormData({ ...formData, is_active: event.target.checked })}
+                    className="h-4 w-4 rounded border border-ui-border dark:border-dark-border"
                   />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="is_active"
-                  checked={formData.is_active}
-                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                  className="rounded border-ui-border dark:border-dark-border"
-                />
-                <label htmlFor="is_active" className="text-sm text-ui-text dark:text-dark-text">
-                  Banner ativo
+                  Ativar imediatamente
                 </label>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -494,24 +378,16 @@ export function AdminBannersPage() {
                     setEditingBanner(null);
                     resetForm();
                   }}
-                  disabled={saving}
-                  className="flex-1 rounded-lg border border-ui-border dark:border-dark-border px-4 py-2 text-sm font-medium text-ui-text dark:text-dark-text hover:bg-ui-bg dark:hover:bg-dark-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="rounded-lg border border-ui-border dark:border-dark-border px-4 py-2 text-sm font-medium text-ui-text dark:text-dark-text hover:bg-ui-bg dark:hover:bg-dark-bg"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-warm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-warm disabled:opacity-50"
                 >
-                  {saving ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                      Salvando...
-                    </div>
-                  ) : (
-                    editingBanner ? 'Salvar' : 'Criar'
-                  )}
+                  {saving ? 'Salvando...' : editingBanner ? 'Atualizar banner' : 'Criar banner'}
                 </button>
               </div>
             </form>

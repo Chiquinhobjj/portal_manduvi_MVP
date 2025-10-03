@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -12,7 +12,7 @@ import {
   Folder,
 } from 'lucide-react';
 import { logger } from '../lib/logger';
-import { mediaPresets, getPresetByFolder } from '../lib/mediaPresets';
+import { getPresetByFolder } from '../lib/mediaPresets';
 
 interface MediaFile {
   id: string;
@@ -26,6 +26,7 @@ interface MediaFile {
   tags: string[];
   alt_text: string | null;
   uploaded_at: string;
+  link_url: string | null;
 }
 
 // Pastas dinâmicas obtidas do Storage para espelhar a UI do Supabase
@@ -38,14 +39,14 @@ function useStorageFolders() {
     async function fetchFolders() {
       try {
         setLoading(true);
-        const { data, error } = await supabase.storage.from('media').list('', {
+  const { data, error } = await supabase.storage.from('media').list('', {
           limit: 100,
           sortBy: { column: 'name', order: 'asc' },
         });
         if (error) throw error;
-        const names = (data || [])
-          .map((item: any) => item.name)
-          .filter((name: string) => !!name);
+        const names = (data ?? [])
+          .map((item) => item?.name)
+          .filter((name): name is string => typeof name === 'string' && name.length > 0);
         if (mounted) setFolders(names);
       } catch (err) {
         logger.error('Erro ao listar pastas do Storage:', err);
@@ -66,7 +67,6 @@ export function AdminMediaPage() {
   const { profile } = useAuth();
   const { folders: storageFolders, loading: loadingFolders } = useStorageFolders();
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
-  const [filteredFiles, setFilteredFiles] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFolder, setSelectedFolder] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -79,17 +79,10 @@ export function AdminMediaPage() {
     folder: 'general',
     alt_text: '',
     tags: '',
+    link_url: '',
   });
 
-  useEffect(() => {
-    fetchMediaFiles();
-  }, []);
-
-  useEffect(() => {
-    filterFiles();
-  }, [mediaFiles, selectedFolder, searchQuery]);
-
-  async function fetchMediaFiles() {
+  const fetchMediaFiles = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('media_library')
@@ -97,33 +90,37 @@ export function AdminMediaPage() {
         .order('uploaded_at', { ascending: false });
 
       if (error) throw error;
-      setMediaFiles(data || []);
+      const normalized = (data ?? []).map((file) => ({
+        ...file,
+        link_url: file.link_url ?? null,
+      }));
+      setMediaFiles(normalized as MediaFile[]);
     } catch (error) {
       logger.error('Error fetching media files:', error);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  function filterFiles() {
-    let filtered = mediaFiles;
+  useEffect(() => {
+    fetchMediaFiles();
+  }, [fetchMediaFiles]);
 
-    if (selectedFolder !== 'all') {
-      filtered = filtered.filter((file) => file.folder === selectedFolder);
-    }
+  const filteredFiles = useMemo(() => {
+    const query = searchQuery.toLowerCase();
 
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (file) =>
-          file.file_name.toLowerCase().includes(query) ||
-          file.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-          (file.alt_text && file.alt_text.toLowerCase().includes(query))
-      );
-    }
+    return mediaFiles.filter((file) => {
+      const matchesFolder = selectedFolder === 'all' || file.folder === selectedFolder;
+      if (!matchesFolder) return false;
 
-    setFilteredFiles(filtered);
-  }
+      if (!query) return true;
+
+      const matchName = file.file_name.toLowerCase().includes(query);
+      const matchTags = file.tags.some((tag) => tag.toLowerCase().includes(query));
+      const matchAlt = file.alt_text?.toLowerCase().includes(query) ?? false;
+      return matchName || matchTags || matchAlt;
+    });
+  }, [mediaFiles, searchQuery, selectedFolder]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -175,6 +172,7 @@ export function AdminMediaPage() {
         folder: uploadData.folder,
         alt_text: uploadData.alt_text || null,
         tags,
+        link_url: uploadData.link_url || null,
         uploaded_by: profile?.id,
       });
 
@@ -241,6 +239,7 @@ export function AdminMediaPage() {
       folder: 'general',
       alt_text: '',
       tags: '',
+      link_url: '',
     });
     setSelectedFile(null);
     setImageSize(null);
@@ -374,7 +373,7 @@ export function AdminMediaPage() {
                 </p>
                 <div className="flex items-center gap-2 text-xs text-ui-muted dark:text-dark-muted">
                   <Folder className="h-3 w-3" />
-                  <span>{folders.find((f) => f.value === file.folder)?.label}</span>
+                  <span>{getPresetByFolder(file.folder)?.label ?? file.folder}</span>
                 </div>
                 {file.width && file.height && (
                   <p className="text-xs text-ui-muted dark:text-dark-muted mt-1">
@@ -542,8 +541,8 @@ export function AdminMediaPage() {
                 </label>
                 <input
                   type="url"
-                  value={(uploadData as any).link_url || ''}
-                  onChange={(e) => setUploadData({ ...uploadData, link_url: e.target.value } as any)}
+                  value={uploadData.link_url}
+                  onChange={(e) => setUploadData({ ...uploadData, link_url: e.target.value })}
                   placeholder="https://... (link quando clicar na imagem)"
                   className="w-full rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                 />

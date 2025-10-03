@@ -1,105 +1,132 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { type JSX, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Search, Filter, CheckCircle, XCircle, Clock, Shield, Building2, CircleUser as UserCircle, Briefcase } from 'lucide-react';
+import {
+  Users,
+  Search,
+  Filter,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Shield,
+  Building2,
+  CircleUser as UserCircle,
+  Briefcase,
+  Loader2,
+} from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import { logger } from '../lib/logger';
+import type { ManduviRole, ManduviUserStatus, UserProfile } from '../lib/types';
+import { fetchAdminUsers, updateAdminUserStatus } from '../admin/services/users';
 
-interface User {
-  id: string;
-  email: string;
-  role: string;
-  status: string;
-  email_verified: boolean;
-  profile_completed: boolean;
-  created_at: string;
-  last_login_at: string | null;
+const roleBadges: Record<ManduviRole, { icon: JSX.Element; label: string }> = {
+  admin: { icon: <Shield className="h-4 w-4" />, label: 'Administrador' },
+  empresa: { icon: <Building2 className="h-4 w-4" />, label: 'Empresa' },
+  terceiro_setor: { icon: <Users className="h-4 w-4" />, label: 'Terceiro Setor' },
+  orgao_publico: { icon: <Shield className="h-4 w-4" />, label: 'Órgão Público' },
+  colaborador: { icon: <Briefcase className="h-4 w-4" />, label: 'Colaborador' },
+  usuario: { icon: <UserCircle className="h-4 w-4" />, label: 'Usuário' },
+};
+
+const statusDescriptors: Record<
+  ManduviUserStatus,
+  { label: string; tone: 'success' | 'warning' | 'danger'; icon: JSX.Element }
+> = {
+  active: {
+    label: 'Ativo',
+    tone: 'success',
+    icon: <CheckCircle className="h-4 w-4" />,
+  },
+  pending: {
+    label: 'Pendente',
+    tone: 'warning',
+    icon: <Clock className="h-4 w-4" />,
+  },
+  suspended: {
+    label: 'Suspenso',
+    tone: 'danger',
+    icon: <XCircle className="h-4 w-4" />,
+  },
+  deleted: {
+    label: 'Removido',
+    tone: 'danger',
+    icon: <XCircle className="h-4 w-4" />,
+  },
+};
+
+function getStatusClasses(tone: 'success' | 'warning' | 'danger') {
+  switch (tone) {
+    case 'success':
+      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
+    case 'warning':
+      return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+    case 'danger':
+    default:
+      return 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300';
+  }
 }
 
 export function AdminUsersPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, profile } = useAuth();
   const navigate = useNavigate();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterRole, setFilterRole] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterRole, setFilterRole] = useState<'all' | ManduviRole>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | ManduviUserStatus>('all');
+  const [updatingUser, setUpdatingUser] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin) {
       navigate('/dashboard');
       return;
     }
+
     fetchUsers();
   }, [isAdmin, navigate]);
 
   async function fetchUsers() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No session');
-
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users`;
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch users');
-      const data = await response.json();
-      setUsers(data || []);
+      setLoading(true);
+      const data = await fetchAdminUsers();
+      setUsers(data);
     } catch (error) {
       logger.error('Error fetching users:', error);
+      alert(error instanceof Error ? error.message : 'Erro ao carregar usuários.');
     } finally {
       setLoading(false);
     }
   }
 
-  async function updateUserStatus(userId: string, newStatus: string) {
+  async function handleUpdateUserStatus(userId: string, newStatus: ManduviUserStatus) {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No session');
-
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users`;
-      const response = await fetch(apiUrl, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId, status: newStatus }),
-      });
-
-      if (!response.ok) throw new Error('Failed to update user');
-
+      setUpdatingUser(userId);
+      await updateAdminUserStatus({ userId, status: newStatus, actorId: profile?.id });
       setUsers((prev) =>
-        prev.map((user) =>
-          user.id === userId ? { ...user, status: newStatus } : user
-        )
+        prev.map((user) => (user.id === userId ? { ...user, status: newStatus } : user))
       );
     } catch (error) {
       logger.error('Error updating user status:', error);
-      alert('Erro ao atualizar status do usuário');
+      alert(error instanceof Error ? error.message : 'Erro ao atualizar status do usuário.');
+    } finally {
+      setUpdatingUser(null);
     }
   }
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = filterRole === 'all' || user.role === filterRole;
-    const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) => {
+      const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesRole = filterRole === 'all' || user.role === filterRole;
+      const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [users, searchTerm, filterRole, filterStatus]);
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-ui-bg dark:bg-dark-bg">
         <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand border-r-transparent"></div>
-          <p className="mt-4 text-ui-muted dark:text-dark-muted">
-            Carregando usuários...
-          </p>
+          <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-brand border-r-transparent" />
+          <p className="mt-4 text-ui-muted dark:text-dark-muted">Carregando usuários...</p>
         </div>
       </div>
     );
@@ -133,7 +160,7 @@ export function AdminUsersPage() {
               type="text"
               placeholder="Buscar por email..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(event) => setSearchTerm(event.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel text-ui-text dark:text-dark-text placeholder-ui-muted dark:placeholder-dark-muted focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all"
             />
           </div>
@@ -142,16 +169,15 @@ export function AdminUsersPage() {
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-ui-muted dark:text-dark-muted" />
             <select
               value={filterRole}
-              onChange={(e) => setFilterRole(e.target.value)}
+              onChange={(event) => setFilterRole(event.target.value as typeof filterRole)}
               className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel text-ui-text dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all appearance-none"
             >
               <option value="all">Todos os perfis</option>
-              <option value="admin">Administrador</option>
-              <option value="empresa">Empresa</option>
-              <option value="terceiro_setor">Terceiro Setor</option>
-              <option value="orgao_publico">Órgão Público</option>
-              <option value="colaborador">Colaborador</option>
-              <option value="usuario">Usuário</option>
+              {Object.entries(roleBadges).map(([role, config]) => (
+                <option key={role} value={role}>
+                  {config.label}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -159,13 +185,15 @@ export function AdminUsersPage() {
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-ui-muted dark:text-dark-muted" />
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={(event) => setFilterStatus(event.target.value as typeof filterStatus)}
               className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel text-ui-text dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all appearance-none"
             >
               <option value="all">Todos os status</option>
-              <option value="pending">Pendente</option>
-              <option value="active">Ativo</option>
-              <option value="suspended">Suspenso</option>
+              {Object.entries(statusDescriptors).map(([status, descriptor]) => (
+                <option key={status} value={status}>
+                  {descriptor.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -193,148 +221,83 @@ export function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-ui-border dark:divide-dark-border">
-                {filteredUsers.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="hover:bg-ui-bg dark:hover:bg-dark-bg transition-colors"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="flex-shrink-0">
-                          {getRoleIcon(user.role)}
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-ui-text dark:text-dark-text">
-                            {user.email}
+                {filteredUsers.map((user) => {
+                  const roleBadge = roleBadges[user.role];
+                  const statusDescriptor = statusDescriptors[user.status];
+
+                  return (
+                    <tr key={user.id} className="hover:bg-ui-bg dark:hover:bg-dark-bg transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-brand/10 text-brand flex items-center justify-center">
+                            <Users className="h-5 w-5" />
                           </div>
-                          <div className="text-xs text-ui-muted dark:text-dark-muted">
-                            ID: {user.id.substring(0, 8)}...
+                          <div>
+                            <p className="text-sm font-medium text-ui-text dark:text-dark-text">{user.email}</p>
+                            <p className="text-xs text-ui-muted dark:text-dark-muted">
+                              criado em {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                            </p>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand">
-                        {getRoleLabel(user.role)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(user.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-ui-muted dark:text-dark-muted">
-                      {new Date(user.created_at).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex items-center gap-2">
-                        {user.status === 'pending' && (
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-xs font-medium text-brand">
+                          {roleBadge?.icon}
+                          {roleBadge?.label ?? 'Indefinido'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(
+                            statusDescriptor?.tone ?? 'warning'
+                          )}`}
+                        >
+                          {statusDescriptor?.icon}
+                          {statusDescriptor?.label ?? 'Desconhecido'}
+                          {updatingUser === user.id && <Loader2 className="h-4 w-4 animate-spin" />}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
                           <button
-                            onClick={() => updateUserStatus(user.id, 'active')}
-                            className="inline-flex items-center gap-1 rounded-lg bg-green-500/10 px-3 py-1.5 text-xs font-medium text-green-600 dark:text-green-400 hover:bg-green-500/20 transition-all"
+                            onClick={() => handleUpdateUserStatus(user.id, 'active')}
+                            className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/40 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-40"
+                            disabled={user.status === 'active' || updatingUser === user.id}
                           >
-                            <CheckCircle className="h-3.5 w-3.5" />
-                            Aprovar
+                            <CheckCircle className="h-4 w-4" />
+                            {user.status === 'pending' ? 'Aprovar' : 'Ativar'}
                           </button>
-                        )}
-                        {user.status === 'active' && (
                           <button
-                            onClick={() =>
-                              updateUserStatus(user.id, 'suspended')
-                            }
-                            className="inline-flex items-center gap-1 rounded-lg bg-orange-500/10 px-3 py-1.5 text-xs font-medium text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 transition-all"
+                            onClick={() => handleUpdateUserStatus(user.id, 'suspended')}
+                            className="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 px-3 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors disabled:opacity-40"
+                            disabled={user.status === 'suspended' || updatingUser === user.id}
                           >
-                            <XCircle className="h-3.5 w-3.5" />
+                            <XCircle className="h-4 w-4" />
                             Suspender
                           </button>
-                        )}
-                        {user.status === 'suspended' && (
-                          <button
-                            onClick={() => updateUserStatus(user.id, 'active')}
-                            className="inline-flex items-center gap-1 rounded-lg bg-green-500/10 px-3 py-1.5 text-xs font-medium text-green-600 dark:text-green-400 hover:bg-green-500/20 transition-all"
-                          >
-                            <CheckCircle className="h-3.5 w-3.5" />
-                            Reativar
-                          </button>
-                        )}
-                      </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredUsers.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-12 text-center text-ui-muted dark:text-dark-muted"
+                    >
+                      Nenhum usuário encontrado com os filtros atuais.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
-
-          {filteredUsers.length === 0 && (
-            <div className="text-center py-12">
-              <Users className="h-12 w-12 text-ui-muted dark:text-dark-muted mx-auto mb-4" />
-              <p className="text-ui-muted dark:text-dark-muted">
-                Nenhum usuário encontrado
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
-}
-
-function getRoleIcon(role: string) {
-  const iconClass = 'h-6 w-6 text-brand';
-  switch (role) {
-    case 'admin':
-      return <Shield className={iconClass} />;
-    case 'empresa':
-      return <Building2 className={iconClass} />;
-    case 'terceiro_setor':
-      return <Users className={iconClass} />;
-    case 'orgao_publico':
-      return <Shield className={iconClass} />;
-    case 'colaborador':
-      return <Briefcase className={iconClass} />;
-    default:
-      return <UserCircle className={iconClass} />;
-  }
-}
-
-function getRoleLabel(role: string) {
-  const labels: Record<string, string> = {
-    admin: 'Administrador',
-    empresa: 'Empresa',
-    terceiro_setor: 'Terceiro Setor',
-    orgao_publico: 'Órgão Público',
-    colaborador: 'Colaborador',
-    usuario: 'Usuário',
-  };
-  return labels[role] || role;
-}
-
-function getStatusBadge(status: string) {
-  switch (status) {
-    case 'active':
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-0.5 text-xs font-medium text-green-600 dark:text-green-400">
-          <CheckCircle className="h-3.5 w-3.5" />
-          Ativo
-        </span>
-      );
-    case 'pending':
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/10 px-2.5 py-0.5 text-xs font-medium text-orange-600 dark:text-orange-400">
-          <Clock className="h-3.5 w-3.5" />
-          Pendente
-        </span>
-      );
-    case 'suspended':
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
-          <XCircle className="h-3.5 w-3.5" />
-          Suspenso
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-500/10 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-400">
-          {status}
-        </span>
-      );
-  }
 }

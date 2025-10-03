@@ -5,7 +5,7 @@ import { useAdImages } from '../hooks/useAdImages';
 import { useMediaLibraryImages } from '../hooks/useMediaLibraryImages';
 
 interface SmartAdCarouselProps {
-  folderPath: string;
+  folderPath?: string;
   location: string;
   className?: string;
   autoRotate?: boolean;
@@ -45,10 +45,30 @@ export function SmartAdCarousel({
   mediaFolder,
   hideWhenEmpty = false,
 }: SmartAdCarouselProps & { source?: 'static' | 'media'; mediaFolder?: string }) {
-  const { images, loading, error } =
-    source === 'media' && mediaFolder
-      ? useMediaLibraryImages(mediaFolder, location, maxImages, { height, resize: 'cover', quality: 85 })
-      : useAdImages(folderPath, location, maxImages);
+  const mediaImages = useMediaLibraryImages(
+    mediaFolder ?? '',
+    location,
+    maxImages,
+    { height, resize: 'cover', quality: 85 },
+    { enabled: source === 'media' && Boolean(mediaFolder) }
+  );
+
+  const staticImages = useAdImages(folderPath ?? '', location, maxImages, {
+    enabled: source === 'static' && Boolean(folderPath),
+  });
+
+  const images = source === 'media' && mediaFolder ? mediaImages.images : staticImages.images;
+  const loading = source === 'media' && mediaFolder ? mediaImages.loading : staticImages.loading;
+  const error = source === 'media' && mediaFolder ? mediaImages.error : staticImages.error;
+  const activeLink = (index: number) => {
+    if (source === 'media' && mediaFolder) {
+      return mediaImages.images[index]?.linkUrl ?? null;
+    }
+    if (source === 'static' && folderPath) {
+      return staticImages.images[index]?.linkUrl ?? null;
+    }
+    return null;
+  };
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -74,15 +94,16 @@ export function SmartAdCarousel({
     setCurrentIndex(index);
   }
 
-  function handleAdClick() {
-    if (defaultLinkUrl) {
-      window.open(defaultLinkUrl, '_blank');
+  function handleAdClick(index: number) {
+    const link = activeLink(index) ?? defaultLinkUrl;
+    if (link) {
+      window.open(link, '_blank');
     }
   }
 
   function handleCTAClick(e: React.MouseEvent) {
     e.stopPropagation(); // Evita que o clique na imagem seja acionado
-    const url = ctaUrl || defaultLinkUrl;
+    const url = activeLink(currentIndex) || ctaUrl || defaultLinkUrl;
     if (url) {
       window.open(url, '_blank');
     }
@@ -152,18 +173,18 @@ export function SmartAdCarousel({
           className="flex transition-transform duration-500 ease-in-out h-full"
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
-          {images.map((image) => (
+          {images.map((image, index) => (
             <div key={image.id} className="min-w-full h-full flex justify-center items-center relative">
               {/* Imagem clicável - agora usando div ao invés de button */}
               <div
-                onClick={() => handleAdClick()}
+                onClick={() => handleAdClick(index)}
                 className="group w-full h-full transition-transform hover:scale-[1.02] cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 rounded-lg overflow-hidden relative"
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    handleAdClick();
+                    handleAdClick(index);
                   }
                 }}
                 aria-label={image.altText}

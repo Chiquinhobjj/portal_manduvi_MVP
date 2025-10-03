@@ -1,37 +1,40 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import type { AuthError, Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
-import type { User, Session } from '@supabase/supabase-js';
+import type { AdminAuthContext, UserProfile } from '../lib/types';
 
-interface UserProfile {
-  id: string;
-  email: string;
-  role: 'admin' | 'empresa' | 'terceiro_setor' | 'orgao_publico' | 'colaborador' | 'usuario';
-  status: 'pending' | 'active' | 'suspended' | 'deleted';
-  email_verified: boolean;
-  phone_verified: boolean;
-  profile_completed: boolean;
-  last_login_at: string | null;
-  metadata: any;
-  created_at: string;
-  updated_at: string;
+const AuthContext = createContext<AdminAuthContext | undefined>(undefined);
+
+function buildFallbackProfile(user: User | null): UserProfile {
+  const generatedId =
+    user?.id ??
+    (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `fallback-${Date.now()}`);
+
+  return {
+    id: generatedId,
+    email: user?.email ?? '',
+    role: 'usuario',
+    status: 'active',
+    email_verified: Boolean(user?.email_confirmed_at),
+    phone_verified: false,
+    profile_completed: true,
+    last_login_at: new Date().toISOString(),
+    metadata: (user?.user_metadata as Record<string, unknown> | undefined) ?? {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    name: typeof user?.user_metadata?.name === 'string' ? user?.user_metadata?.name : undefined,
+  };
 }
-
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  profile: UserProfile | null;
-  isAdmin: boolean;
-  loading: boolean;
-  error: string | null;
-  signIn: (email: string, password: string) => Promise<{ error?: any }>;
-  signUp: (email: string, password: string, metadata?: any) => Promise<{ error?: any }>;
-  signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error?: any }>;
-  refreshProfile: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -42,26 +45,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isAdmin = profile?.role === 'admin';
 
+  const fetchUserProfile = useCallback(
+    async (userId: string) => {
+      try {
+        setError(null);
+        console.log('Buscando perfil para usuário:', userId);
+        
+        const { data, error: supabaseError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (supabaseError) {
+          console.error('Erro do Supabase ao buscar perfil:', supabaseError);
+          
+          // Se a tabela não existe ou há problema de RLS, criar perfil básico
+          if (supabaseError.code === 'PGRST116' || 
+              supabaseError.message.includes('relation "users" does not exist') ||
+              supabaseError.code === '42P01') {
+            
+            console.log('Tabela users não existe, criando perfil básico');
+            setProfile(buildFallbackProfile(user ?? null));
+            return;
+          }
+          
+          // Outros erros - criar perfil básico para não travar
+          console.log('Erro ao buscar perfil, criando perfil básico:', supabaseError.message);
+          setProfile(buildFallbackProfile(user ?? null));
+          return;
+        }
+
+        if (data) {
+          console.log('Perfil carregado:', data);
+          setProfile({
+            ...data,
+            metadata: (data.metadata as Record<string, unknown> | undefined) ?? {},
+          });
+        } else {
+          console.log('Nenhum perfil encontrado, criando perfil básico');
+          // Criar perfil básico diretamente sem tentar sincronizar
+          setProfile(buildFallbackProfile(user ?? null));
+        }
+      } catch (error) {
+        console.error('Erro ao buscar perfil do usuário:', error);
+        logger.error('Erro ao buscar perfil do usuário:', error);
+        
+        // Em caso de erro, criar perfil básico para não travar
+        setProfile(buildFallbackProfile(user ?? null));
+      } finally {
+        // SEMPRE definir loading como false
+        console.log('Finalizando carregamento do perfil');
+        setLoading(false);
+      }
+    },
+    [user]
+  );
+
   useEffect(() => {
     let mounted = true;
-    let timeoutId: NodeJS.Timeout;
-    // Timeout amigável aumentado para 30s e sem erro duro
-    timeoutId = setTimeout(() => {
-      if (mounted && loading) {
+    const timeoutId = setTimeout(() => {
+      if (!mounted) return;
+      setLoading((prev) => {
+        if (!prev) {
+          return prev;
+        }
         console.warn('Autenticação demorando... mantendo app utilizável');
-        setLoading(false);
-        // Não definir erro aqui para evitar bloqueio do app
-      }
+        return false;
+      });
     }, 30000);
 
-    // Função para inicializar a autenticação
     const initializeAuth = async () => {
       try {
         console.log('Inicializando autenticação...');
-        
-        // Obter sessão atual com pequenas tentativas
+
         let currentSession: Session | null = null;
-        let sessionError: any = null;
+        let sessionError: AuthError | null = null;
         for (let attempt = 1; attempt <= 3; attempt++) {
           const { data: { session }, error } = await supabase.auth.getSession();
           if (!error) {
@@ -76,7 +135,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (sessionError) {
           console.error('Erro ao obter sessão:', sessionError);
           if (mounted) {
-            // Não bloquear o app: limpar loading e permitir navegação pública
             setLoading(false);
             setError('Erro ao verificar autenticação');
           }
@@ -88,13 +146,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(currentSession?.user || null);
         }
 
-        // Se há usuário logado, buscar perfil
         if (currentSession?.user && mounted) {
           await fetchUserProfile(currentSession.user.id);
         } else if (mounted) {
           setLoading(false);
         }
-
       } catch (error) {
         console.error('Erro na inicialização:', error);
         if (mounted) {
@@ -104,11 +160,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Listener para mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
-        
+
         if (!mounted) return;
 
         setSession(session);
@@ -128,115 +183,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
-      if (timeoutId) clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchUserProfile]);
 
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      setError(null);
-      console.log('Buscando perfil para usuário:', userId);
-      
-      const { data, error: supabaseError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (supabaseError) {
-        console.error('Erro do Supabase ao buscar perfil:', supabaseError);
-        
-        // Se a tabela não existe ou há problema de RLS, criar perfil básico
-        if (supabaseError.code === 'PGRST116' || 
-            supabaseError.message.includes('relation "users" does not exist') ||
-            supabaseError.code === '42P01') {
-          
-          console.log('Tabela users não existe, criando perfil básico');
-          const basicProfile: UserProfile = {
-            id: userId,
-            email: user?.email || '',
-            role: 'usuario',
-            status: 'active',
-            email_verified: user?.email_confirmed_at !== null,
-            phone_verified: false,
-            profile_completed: true,
-            last_login_at: new Date().toISOString(),
-            metadata: {},
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-          setProfile(basicProfile);
-          return;
-        }
-        
-        // Outros erros - criar perfil básico para não travar
-        console.log('Erro ao buscar perfil, criando perfil básico:', supabaseError.message);
-        const basicProfile: UserProfile = {
-          id: userId,
-          email: user?.email || '',
-          role: 'usuario',
-          status: 'active',
-          email_verified: user?.email_confirmed_at !== null,
-          phone_verified: false,
-          profile_completed: true,
-          last_login_at: new Date().toISOString(),
-          metadata: {},
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        setProfile(basicProfile);
-        return;
-      }
-
-      if (data) {
-        console.log('Perfil carregado:', data);
-        setProfile(data);
-      } else {
-        console.log('Nenhum perfil encontrado, criando perfil básico');
-        // Criar perfil básico diretamente sem tentar sincronizar
-        const basicProfile: UserProfile = {
-          id: userId,
-          email: user?.email || '',
-          role: 'usuario',
-          status: 'active',
-          email_verified: user?.email_confirmed_at !== null,
-          phone_verified: false,
-          profile_completed: true,
-          last_login_at: new Date().toISOString(),
-          metadata: {},
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        setProfile(basicProfile);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar perfil do usuário:', error);
-      logger.error('Erro ao buscar perfil do usuário:', error);
-      
-      // Em caso de erro, criar perfil básico para não travar
-      const basicProfile: UserProfile = {
-        id: userId,
-        email: user?.email || '',
-        role: 'usuario',
-        status: 'active',
-        email_verified: user?.email_confirmed_at !== null,
-        phone_verified: false,
-        profile_completed: true,
-        last_login_at: new Date().toISOString(),
-        metadata: {},
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      setProfile(basicProfile);
-    } finally {
-      // SEMPRE definir loading como false
-      console.log('Finalizando carregamento do perfil');
-      setLoading(false);
-    }
-  };
-
-  const syncUserWithDatabase = async (authUser: User) => {
+  const syncUserWithDatabase = useCallback(async (authUser: User) => {
     try {
       console.log('Sincronizando usuário com banco de dados:', authUser.email);
       
@@ -302,14 +254,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Erro na sincronização:', error);
       logger.error('Erro ao sincronizar usuário:', error);
     }
-  };
+  }, []);
 
-  const signIn = async (email: string, password: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -320,22 +273,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await syncUserWithDatabase(data.user);
       }
 
-      return { error: null };
-    } catch (error: any) {
-      logger.error('Erro no login:', error);
-      setError(error.message);
-      return { error };
-    } finally {
-      setLoading(false);
-    }
-  };
+        return { error: null };
+      } catch (error) {
+        logger.error('Erro no login:', error);
+        const message = error instanceof Error ? error.message : 'Erro ao efetuar login';
+        setError(message);
+        return { error: error as AuthError };
+      } finally {
+        setLoading(false);
+      }
+    },
+    [syncUserWithDatabase]
+  );
 
-  const signUp = async (email: string, password: string, metadata?: any) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const { error } = await supabase.auth.signUp({
+  const signUp = useCallback(
+    async (
+      email: string,
+      password: string,
+      metadata?: Record<string, unknown>
+    ) => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -345,17 +306,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
 
-      return { error: null };
-    } catch (error: any) {
-      logger.error('Erro no registro:', error);
-      setError(error.message);
-      return { error };
-    } finally {
-      setLoading(false);
-    }
-  };
+        return { error: null };
+      } catch (error) {
+        logger.error('Erro no registro:', error);
+        const message = error instanceof Error ? error.message : 'Erro ao registrar usuário';
+        setError(message);
+        return { error: error as AuthError };
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       setLoading(true);
       const { error } = await supabase.auth.signOut();
@@ -364,45 +328,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setSession(null);
       setProfile(null);
-    } catch (error: any) {
+    } catch (error) {
       logger.error('Erro no logout:', error);
-      setError(error.message);
+      const message = error instanceof Error ? error.message : 'Erro ao sair';
+      setError(message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = useCallback(async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email);
       if (error) throw error;
       return { error: null };
-    } catch (error: any) {
+    } catch (error) {
       logger.error('Erro ao resetar senha:', error);
-      return { error };
+      return { error: error as AuthError };
     }
-  };
+  }, []);
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (user) {
       setLoading(true);
       await fetchUserProfile(user.id);
     }
-  };
+  }, [fetchUserProfile, user]);
 
-  const value = {
-    user,
-    session,
-    profile,
-    isAdmin,
-    loading,
-    error,
-    signIn,
-    signUp,
-    signOut,
-    resetPassword,
-    refreshProfile,
-  };
+  const value = useMemo<AdminAuthContext>(
+    () => ({
+      user,
+      session,
+      profile,
+      isAdmin,
+      loading,
+      error,
+      signIn,
+      signUp,
+      signOut,
+      resetPassword,
+      refreshProfile,
+    }),
+    [
+      error,
+      isAdmin,
+      loading,
+      profile,
+      session,
+      signIn,
+      signOut,
+      signUp,
+      resetPassword,
+      refreshProfile,
+      user,
+    ]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

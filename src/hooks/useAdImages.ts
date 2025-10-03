@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { logger } from '../lib/logger';
 
 interface AdImage {
@@ -7,19 +7,28 @@ interface AdImage {
   fileName: string;
   altText: string;
   title: string;
+  linkUrl: string | null;
 }
 
-export function useAdImages(folderPath: string, location: string, maxImages: number = 5) {
+export function useAdImages(
+  folderPath: string,
+  location: string,
+  maxImages: number = 5,
+  options: { enabled?: boolean } = {}
+) {
   const [images, setImages] = useState<AdImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { enabled = true } = options;
 
-  useEffect(() => {
-    loadImagesFromFolder();
-  }, [folderPath, maxImages]);
-
-  async function loadImagesFromFolder() {
+  const loadImagesFromFolder = useCallback(async () => {
     try {
+      if (!enabled) {
+        setImages([]);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
@@ -30,7 +39,8 @@ export function useAdImages(folderPath: string, location: string, maxImages: num
         imageUrl: `${folderPath}/${fileName}`,
         fileName,
         altText: `Material Publicitário ${index + 1}`,
-        title: `Propaganda ${index + 1}`
+        title: `Propaganda ${index + 1}`,
+        linkUrl: null,
       }));
 
       setImages(adImages);
@@ -39,7 +49,11 @@ export function useAdImages(folderPath: string, location: string, maxImages: num
     } finally {
       setLoading(false);
     }
-  }
+  }, [enabled, folderPath, location, maxImages]);
+
+  useEffect(() => {
+    loadImagesFromFolder();
+  }, [loadImagesFromFolder]);
 
   return { images, loading, error, reload: loadImagesFromFolder };
 }

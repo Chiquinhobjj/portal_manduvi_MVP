@@ -1,13 +1,27 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LayoutDashboard, Image, FileText, Settings, Users, File as FileEdit, Menu, X, LogOut, ChevronRight } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Image,
+  FileText,
+  Settings,
+  Users,
+  File as FileEdit,
+  Menu,
+  X,
+  LogOut,
+  ChevronRight,
+} from 'lucide-react';
+import type { ComponentType, SVGProps } from 'react';
 import { cn } from '../lib/utils';
+
+type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 interface NavItem {
   label: string;
   path: string;
-  icon: any;
+  icon: IconComponent;
 }
 
 const navItems: NavItem[] = [
@@ -32,8 +46,15 @@ export function AdminLayout() {
   }
 
   function toggleSidebar() {
-    setSidebarOpen(!sidebarOpen);
+    setSidebarOpen((prev) => !prev);
   }
+
+  const adminDisplayName = profile?.name
+    || (typeof profile?.metadata?.display_name === 'string'
+      ? profile?.metadata?.display_name
+      : undefined)
+    || profile?.email
+    || 'Administrador';
 
   return (
     <div className="min-h-screen bg-ui-bg dark:bg-dark-bg">
@@ -96,7 +117,7 @@ export function AdminLayout() {
             <div className="border-t border-ui-border dark:border-dark-border p-4">
               <div className="mb-3 rounded-lg bg-ui-bg dark:bg-dark-bg p-3">
                 <p className="text-sm font-medium text-ui-text dark:text-dark-text">
-                  {profile?.name || 'Admin'}
+                  {adminDisplayName}
                 </p>
                 <p className="text-xs text-ui-muted dark:text-dark-muted">
                   {profile?.email}

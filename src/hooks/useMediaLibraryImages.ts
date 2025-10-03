@@ -8,22 +8,20 @@ interface AdImage {
   fileName: string;
   altText: string;
   title: string;
+  linkUrl: string | null;
 }
 
 export function useMediaLibraryImages(
   folder: string,
   location: string,
   maxImages: number = 5,
-  transform?: { width?: number; height?: number; resize?: 'cover' | 'contain' | 'fill'; quality?: number }
+  transform?: { width?: number; height?: number; resize?: 'cover' | 'contain' | 'fill'; quality?: number },
+  options: { enabled?: boolean } = {}
 ) {
   const [images, setImages] = useState<AdImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const serializedTransform = useMemo(
-    () => JSON.stringify(transform ?? {}),
-    [transform]
-  );
+  const { enabled = true } = options;
 
   const normalizedTransform = useMemo(() => {
     if (!transform) return undefined;
@@ -33,12 +31,18 @@ export function useMediaLibraryImages(
       resize: transform.resize,
       quality: transform.quality,
     };
-  }, [serializedTransform]);
+  }, [transform]);
 
   const loadImagesFromMediaLibrary = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+
+      if (!enabled) {
+        setImages([]);
+        setLoading(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('media_library')
@@ -76,6 +80,7 @@ export function useMediaLibraryImages(
           fileName: file.file_name,
           altText: file.alt_text || file.file_name,
           title: file.file_name,
+          linkUrl: file.link_url ?? null,
         };
       });
 
@@ -86,7 +91,7 @@ export function useMediaLibraryImages(
     } finally {
       setLoading(false);
     }
-  }, [folder, location, maxImages, normalizedTransform]);
+  }, [enabled, folder, location, maxImages, normalizedTransform]);
 
   useEffect(() => {
     loadImagesFromMediaLibrary();
