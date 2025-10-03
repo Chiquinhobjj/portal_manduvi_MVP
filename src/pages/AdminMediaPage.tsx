@@ -28,20 +28,43 @@ interface MediaFile {
   uploaded_at: string;
 }
 
-const folders = [
-  { value: 'general', label: 'Geral' },
-  { value: 'banners', label: 'Banners (Home)' },
-  { value: 'ads_leaderboard', label: 'Publicidade – Topo (970x120)' },
-  { value: 'ads_mpu', label: 'Publicidade – MPU (300x250)' },
-  { value: 'ads_halfpage', label: 'Publicidade – Half Page (300x600)' },
-  { value: 'ads_incontent', label: 'Publicidade – In-Content (300x250)' },
-  { value: 'editais', label: 'Editais' },
-  { value: 'news', label: 'Notícias' },
-  { value: 'initiatives', label: 'Iniciativas' },
-];
+// Pastas dinâmicas obtidas do Storage para espelhar a UI do Supabase
+function useStorageFolders() {
+  const [folders, setFolders] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    async function fetchFolders() {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase.storage.from('media').list('', {
+          limit: 100,
+          sortBy: { column: 'name', order: 'asc' },
+        });
+        if (error) throw error;
+        const names = (data || [])
+          .map((item: any) => item.name)
+          .filter((name: string) => !!name);
+        if (mounted) setFolders(names);
+      } catch (err) {
+        logger.error('Erro ao listar pastas do Storage:', err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    fetchFolders();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return { folders, loading };
+}
 
 export function AdminMediaPage() {
   const { profile } = useAuth();
+  const { folders: storageFolders, loading: loadingFolders } = useStorageFolders();
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [filteredFiles, setFilteredFiles] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -264,7 +287,7 @@ export function AdminMediaPage() {
           <div className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel p-4">
             <p className="text-sm text-ui-muted dark:text-dark-muted mb-1">Pastas</p>
             <p className="text-2xl font-bold text-ui-text dark:text-dark-text">
-              {folders.length}
+              {loadingFolders ? '...' : storageFolders.length}
             </p>
           </div>
         </div>
@@ -287,9 +310,9 @@ export function AdminMediaPage() {
             className="rounded-lg border border-ui-border dark:border-dark-border bg-ui-panel dark:bg-dark-panel px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           >
             <option value="all">Todas as Pastas</option>
-            {folders.map((folder) => (
-              <option key={folder.value} value={folder.value}>
-                {folder.label}
+            {storageFolders.map((name) => (
+              <option key={name} value={name}>
+                {getPresetByFolder(name)?.label || name}
               </option>
             ))}
           </select>
@@ -490,9 +513,9 @@ export function AdminMediaPage() {
                   className="w-full rounded-lg border border-ui-border dark:border-dark-border bg-ui-bg dark:bg-dark-bg px-4 py-2 text-ui-text dark:text-dark-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                   required
                 >
-                  {folders.map((folder) => (
-                    <option key={folder.value} value={folder.value}>
-                      {folder.label}
+                  {storageFolders.map((name) => (
+                    <option key={name} value={name}>
+                      {getPresetByFolder(name)?.label || name}
                     </option>
                   ))}
                 </select>

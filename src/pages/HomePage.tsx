@@ -105,7 +105,7 @@ O sistema consultou múltiplas fontes e identificou os seguintes pontos principa
       <div className="mb-8">
         <SmartAdCarousel
           source="media"
-          mediaFolder="banners"
+          mediaFolder="ads_banner_carousel"
           folderPath="/fotos/propaganda/modelo_BannerCarousel_970x120px"
           location="HOME-MEIO"
           height={480}
